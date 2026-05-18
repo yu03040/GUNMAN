@@ -1,81 +1,141 @@
 # AIEnemy クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/Enemy/AIEnemy.h / .cpp`
 
-![GUNMANCharacter_ClassDiagram](Images/GUNMANCharacter_ClassDiagram.png)
+## 概要
 
-**AIEnemyクラス**は `ACharacter` クラスを継承した**敵AIクラス**です。  
-このクラスを継承した Blueprint が 3 つあり、巡回する敵とランダムに動く敵がいます。  
+`AAIEnemy` は `ACharacter` を継承した敵キャラクタークラスです。  
+`IAIEnemyInterface` と `IEnemyAIControllerInterface` の 2 つのインターフェースを実装します。
 
-このクラスは以下の要素を含んでいます。
+このクラスを継承した Blueprint が 3 種類あり、タグで巡回パターンを切り替えます。
 
-- **Tick関数の設定**：毎フレーム処理を行うためにTickを有効にしています。
-- **コンポーネントの作成**：敵の武器やウィジェット（HPバーなど）のコンポーネントを定義・アタッチしています。
-- **プロパティの設定**：敵の体力、攻撃力、武器の情報を格納するためのプロパティが定義されています。
-- **Timelineの設定**：`FTimeline`を使用して、敵の動きを滑らかに制御しています。
-- **ダメージ処理**：ダメージを受けたときの体力の減少や死亡後の処理を管理し、プレイヤーにダメージを与える処理も定義しています。
+| Blueprint | タグ | 巡回パターン |
+|---|---|---|
+| `BP_EnemyAI_Path_A` | `PathA` | 巡回路 A を回る |
+| `BP_EnemyAI_Path_B` | `PathB` | 巡回路 B を回る |
+| `BP_EnemyAI_Path_Random` | `Random` | ランダムに移動 |
 
-## このクラスのソースコードの説明
+## クラス図
 
-### コンストラクター (`AAIEnemy::AAIEnemy`)
+```mermaid
+classDiagram
+    ACharacter <|-- AAIEnemy
+    IAIEnemyInterface <|.. AAIEnemy : implements
+    IEnemyAIControllerInterface <|.. AAIEnemy : implements
+    AAIEnemy <|-- BP_EnemyAI_Path_A
+    AAIEnemy <|-- BP_EnemyAI_Path_B
+    AAIEnemy <|-- BP_EnemyAI_Path_Random
 
-- `PrimaryActorTick.bCanEverTick = true;`  
-  毎フレームTickを呼び出す設定。
+    class AAIEnemy {
+        +int index
+        +AttackCharacter_Implementation()
+        +ChangeRunningSpeed_Implementation(float)
+        +GetCurrentHealth() float
+        +GetHealthPercent() float
+        +GetIsAlive() bool
+    }
+    class BP_EnemyAI_Path_A { <<Blueprint>> }
+    class BP_EnemyAI_Path_B { <<Blueprint>> }
+    class BP_EnemyAI_Path_Random { <<Blueprint>> }
+```
 
-- `AIControllerClass = AAIEnemyController::StaticClass();`  
-  AIコントローラークラスを指定。
+---
 
-- **コンポーネント作成**  
-  - `Weapon`：武器用のスケルタルメッシュを作成し、キャラクターメッシュにアタッチ。
-  - `Widget`：HPバー等のウィジェットを作成し、キャラクターメッシュにアタッチ。
+## コンポーネント一覧
 
-- **データテーブルのロード**  
-  `DT_Weapon`というデータテーブルから武器情報を取得。
+| コンポーネント | 型 | 説明 |
+|---|---|---|
+| `Weapon` | `USkeletalMeshComponent` | 武器メッシュ。`GetMesh()` の子コンポーネント |
+| `Widget` | `UWidgetComponent` | 頭上 HP バー表示用。`GetMesh()` の子コンポーネント |
 
-- **タイムライン設定**  
-  `RunTimeline`を初期化し、`FloatCurve`を使ってスムーズな移動速度の変化を制御。
+---
 
-- **プロパティの初期化**  
-  敵の体力や攻撃力、死亡時の処理に関連するプロパティを初期化。
+## プロパティ一覧
 
-### `BeginPlay` 関数
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `CurrentHealth` | `float` | 30.0 | 現在の体力 |
+| `MaxHealth` | `float` | 30.0 | 最大体力（`CurrentHealth` と同値で初期化） |
+| `DeadHealth` | `float` | 0.0 | 死亡判定の体力閾値 |
+| `EnemyATK` | `float` | 10.0 | プレイヤーに与えるダメージ |
+| `InLifeSpan` | `float` | 2.0 | 死亡後に Destroy されるまでの秒数 |
+| `bIsAlive` | `bool` | true | 生存フラグ（死亡時に `false` になる） |
+| `HitAnimMontage` | `TArray<UAnimMontage*>` | — | 被弾アニメーション配列（4 要素、ランダム再生） |
+| `index` | `int` | 0 | `BTT_TaskPath` が参照する巡回インデックス（各敵が個別に保持） |
 
-- ゲーム開始時に呼ばれる関数。
-- プレイヤーキャラクターを取得し、敵AIコントローラーを設定。
-- ダメージを受けたときの処理を`OnTakeAnyDamage`デリゲートにバインド。
-- 武器のデータをデータテーブルから取得し、キャラクターメッシュにアタッチ。
+---
 
-### `Tick` 関数
+## 関数の説明
 
-- 毎フレーム呼び出される処理ですが、このクラスでは特に何もしていません（基本的な処理のみ）。
+### `AAIEnemy()` コンストラクタ
 
-### `AttackCharacter_Implementation` 関数
+主な初期化：
+- `AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned` — レベル配置・スポーン生成どちらにも AI を適用
+- `Weapon` / `Widget` を `GetMesh()` の子として生成
+- `DT_Weapon` DataTable をロード
+- `CB_EnemyRun` カーブから `FTimeline*` を heap 生成し、長さ 1 秒で初期化
+- `CurrentHealth = 30.0f`, `MaxHealth = CurrentHealth`, `EnemyATK = 10.0f`, `InLifeSpan = 2.0f`
 
-- 敵が攻撃を行う際の処理。
-  - 武器データをデータテーブルから取得し、効果音を再生。
-  - 発砲アニメーションを再生し、銃口エフェクトを生成。
-  - 弾薬を生成し、`CreateAmmunition()`で弾道をシミュレーション。
+> **`PlacedInWorldOrSpawned` について**  
+> デフォルトの `PlacedInWorld` ではスポーン生成された敵に AI が適用されませんでした。  
+> `PlacedInWorldOrSpawned` に変更することで、`EnemyTargetPoint` から動的に生成された敵にも正しく AI が付くようになりました（[AppealPoint.md](../AppealPoint.md) 参照）。
 
-### `CreateAmmunition` 関数
+### `BeginPlay()`
 
-- 弾薬の生成と、プレイヤーに命中した場合のダメージ処理。
-- `LineTraceSingle()`を使用して弾道の判定を行い、命中時にダメージを与えます。
+1. `UGameplayStatics::GetPlayerCharacter` でプレイヤー参照を取得
+2. `OnTakeAnyDamage` に `HandleAnyDamage` をバインド
+3. `Widget->GetUserWidgetObject()` から `UUIEnemy` を取得し、`SetOwningEnemy(this)` で自身を渡す
+4. DataTable の `"Rifle"` 行を参照し、武器を `EquipSocketName` ソケットにアタッチ
 
-### `HandleAnyDamage` 関数
+### `AttackCharacter_Implementation()`
 
-- 敵がダメージを受けた際の処理。
-  - 体力が減少し、体力が0以下になると死亡処理を実行。
-  - 死亡時には移動を無効化し、物理シミュレーションをオンにしてキャラクターが倒れる動作を実現。
+`bIsAlive` が `true` の場合のみ実行されます：
 
-### `TimeLineFunc` 関数
+1. DataTable の `"Rifle"` 行から `EquippedWeaponInformation` を更新
+2. 発射 SE を再生（`PlaySound2D`）
+3. 発射アニメーションモンタージュを再生（`PlayAnimMontage`、再生速度 0.1）
+4. マズルフラッシュをアタッチ（`SpawnEmitterAttached`）
+5. `CreateAmmunition()` でライントレース判定
 
-- タイムラインの更新時に呼ばれる関数。`FInterpTo`を使って移動速度を滑らかに変化させています。
+### `CreateAmmunition()`
 
-### `ChangeRunningSpeed_Implementation` 関数
+銃口から前方 10,000 ユニットへ `ECC_Visibility` でライントレースを実行し、ヒットしたアクターがプレイヤーであれば `EnemyATK`（10.0）のダメージを適用します。
 
-- タイムラインを再生し、指定したスピードに敵の移動速度を変更します。
+```
+銃口位置 (AmmunitionSocketName) → 前方 10,000 units → LineTrace
+    ↓ ヒット & Player だった場合
+UGameplayStatics::ApplyDamage(Player, 10.0f)
+```
 
-### `Getter` 関数
+薬莢アクター（`AmmunitionClass`）はマズルソケット位置にスポーンされます。
 
-- `GetCurrentHealth()`：現在の体力を返します。
-- `GetHealthPercent()`：体力の割合を返します。
+### `HandleAnyDamage()`
+
+`OnTakeAnyDamage` デリゲートのコールバックです。
+
+```mermaid
+flowchart TD
+    D["ダメージ受信\nCurrentHealth -= Damage"]
+    D --> C{CurrentHealth <= 0?}
+    C -- Yes --> E["DisableMovement()\nコリジョン無効\nSetSimulatePhysics(true)\nSetLifeSpan(2.0f)\nbIsAlive = false"]
+    C -- No --> H["RandomIntegerInRange(0,3)\nHitAnimMontage[i] を再生"]
+```
+
+- 死亡時は物理シミュレーションをオンにしてラグドール状態にし、2 秒後に自動 Destroy
+- 生存時は 4 種類の被弾モンタージュからランダムに 1 つ再生
+
+### `TimeLineFunc(float Value)`
+
+タイムラインのフレームコールバックです。`FMath::FInterpTo` で `MaxWalkSpeed` を `EnemySpeed` に向けて補間（補間速度 5.0）します。
+
+### `ChangeRunningSpeed_Implementation(float Speed)`
+
+`IAIEnemyInterface::ChangeRunningSpeed` の実装です。`EnemySpeed = Speed` に設定した後、`RunTimeline->PlayFromStart()` でタイムラインを再生して速度補間を開始します。
+
+### Getter
+
+| 関数 | 戻り値 | 説明 |
+|---|---|---|
+| `GetCurrentHealth()` | `float` | 現在の体力 |
+| `GetHealthPercent()` | `float` | `CurrentHealth / MaxHealth`（UI の HP バーが使用） |
+| `GetIsAlive()` | `bool` | 生存フラグ `bIsAlive` を返す |

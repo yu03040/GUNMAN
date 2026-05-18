@@ -1,42 +1,60 @@
 # GameClearMapScript クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/LevelScript/GameClearMapScript.h / .cpp`
 
-![Level_ClassDiagrams](Images/Level_ClassDiagrams.png)
+## 概要
 
-`GameClearMapScript` クラスは、`LevelScriptActor` と `BaseMapScript` を継承した、ゲームクリアマップ用のカスタムクラスです。このクラスは以下の機能を持っています。
+`AGameClearMapScript` は `ABaseMapScript` を継承した**ゲームクリア画面専用の LevelScript** です。  
+クリア画面の UI 表示・ボタン選択・決定時の処理を管理します。
 
-- **ゲームクリアマップ用入力システムの構築**：`EnhancedInput` を利用し、ゲームクリア画面での操作を管理します。`InputAction` や `InputMappingContext` をコンストラクタでロードし、マップ上での入力を処理します。
-  
-- **ゲームクリアウィジェットの表示**：ゲームクリア時に専用の UI ウィジェットを生成・表示し、ユーザーインターフェースを構築します。
+クラス継承図は [BaseMapScript](BaseMapScript.md) を参照してください。
 
-- **ボタンの選択状態に応じた色の変更**：仮想関数 `ChangeButtonColor()` をオーバーライドし、選択されたボタンの色を変更します。
+## プロパティ一覧
 
-- **クリックイベントのオーバーライド**：選択されたボタンに応じて、適切なアクションが発生する `UpdateOutputButton()` 関数をオーバーライドします。
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `UI_GameClear` | `UUIGameClear*` | null | クリア画面ウィジェットの参照 |
+| `DefaultMappingContext` | `UInputMappingContext*` | `IMC_OperatingUI` | UI 操作用の入力マッピング |
+| `EnterAction` | `UInputAction*` | `IA_Enter` | 決定アクション |
+| `DownArrowKeyAction` | `UInputAction*` | `IA_DownArrowKey` | 下移動アクション |
+| `UpArrowKeyAction` | `UInputAction*` | `IA_UpArrowKey` | 上移動アクション |
+| `MaxButtonCounter` | `int` | 2 | ボタン数 |
+| `InvalidButtonIndex` | `int` | 3 | 範囲外インデックス |
 
-# 関数の説明
+## ボタンインデックスと対応
 
-### コンストラクタ （`AGameClearMapScript::AGameClearMapScript`）
-このコンストラクタでは、主にプロパティの初期化と `EnhancedInput` 用のアセットをロードしています。
-- **UI_GameClear**：ゲームクリア画面のウィジェット。初期値は `NULL`。
-- **MaxButtonCounter** と **InvalidButtonIndex**：ボタン選択用のカウンタと無効なボタンインデックスを初期化。
-- **InputMappingContext** と **InputAction** のロード：`EnhancedInput` を使うためのマッピングコンテキストと入力アクション（`EnterAction`、`DownArrowKeyAction`、`UpArrowKeyAction`）をロード。
+| ButtonCounter | ボタン | 処理 |
+|---|---|---|
+| 1 | Continue（タイトルへ） | `OnClickedContinue_Button()` → TitleMap へ遷移 |
+| 2 | Game End | `OnClickedGameEnd_Button()` → アプリ終了 |
 
-### `BeginPlay()` 関数
-ゲームが開始されたときに呼ばれ、以下の処理を行います。
-- **プレイヤーコントローラーの取得**：`UGameplayStatics::GetPlayerController()` でプレイヤーのコントローラーを取得。
-- **EnhancedInput サブシステムへのコンテキスト追加**：取得したプレイヤーコントローラーに `DefaultMappingContext` を追加し、入力を設定します。
-- **ウィジェットの生成と表示**：`WBP_GameClear` というブループリントからウィジェットをロードし、画面に表示します。
-- **初期ボタンの選択状態**：初期状態で "Continue" ボタンが選択された状態にし、背景色を `SelectedColor` に変更します。
+## 入力アクション一覧
 
-### `SetupInput()` 関数
-この関数では、プレイヤーコントローラーの `InputComponent` を使って、入力に対するアクションをバインドします。
-- **BindAction**：`EnterAction`、`DownArrowKeyAction`、`UpArrowKeyAction` の各アクションをそれぞれ `UpdateOutputButton`、`UI_DownwardMovement`、`UI_UpwardMovement` にバインドし、プレイヤーが対応するキーを押したときの処理を行います。
+| InputAction | トリガー | コールバック |
+|---|---|---|
+| `IA_Enter` | Triggered | `UpdateOutputButton` |
+| `IA_DownArrowKey` | Triggered | `UI_DownwardMovement` |
+| `IA_UpArrowKey` | Triggered | `UI_UpwardMovement` |
 
-### `ChangeButtonColor()` 関数
-この関数はボタンの選択状態に応じて色を変更します。
-- **ContinueButton と EndButton の背景色変更**：選択されたボタンに応じて背景色を `SelectedColor` に変更し、他のボタンの色は白色に戻します。
+## 関数の説明
 
-### `UpdateOutputButton()` 関数
-選択されているボタンに応じて、対応するアクションを実行します。
-- **ボタンの切り替え**：`ButtonCounter` の値に基づいて、`UI_GameClear->OnClickedContinue_Button()` または `UI_GameClear->OnClickedGameEnd_Button()` を呼び出し、対応するボタンがクリックされたときのイベントを発生させます。
+### `AGameClearMapScript()` コンストラクタ
+- `MaxButtonCounter = 2`、`InvalidButtonIndex = 3`
+- `IMC_OperatingUI` / `IA_Enter` / `IA_DownArrowKey` / `IA_UpArrowKey` をロード
+
+### `BeginPlay()`
+1. `IMC_OperatingUI` を `EnhancedInputLocalPlayerSubsystem` に追加
+2. `SetupInput` で入力アクションをバインド
+3. `WBP_GameClear` を同期ロードして `UUIGameClear` ウィジェットを生成・`AddToViewport`
+4. `SetInputMode(FInputModeGameOnly)` でゲームパッド操作を有効化
+5. `Continue` ボタンを `SelectedColor` で初期選択状態にする
+
+### `SetupInput(TObjectPtr<UInputComponent>)`
+`EnhancedInputComponent` に Enter・Down・Up アクションをバインドします。
+
+### `ChangeButtonColor()`
+`Continue` ボタンと `GameEnd` ボタンを白にリセットしてから、`ButtonCounter` に対応するボタンを `SelectedColor` にします。
+
+### `UpdateOutputButton()`
+`ButtonCounter == 1` なら `OnClickedContinue_Button()`（TitleMap 遷移）、  
+`ButtonCounter == 2` なら `OnClickedGameEnd_Button()`（アプリ終了）を呼び出します。

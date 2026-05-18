@@ -1,34 +1,47 @@
 # WeaponAmmunition クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/ArmedWeapon/WeaponAmmunition.h / .cpp`
 
-`WeaponAmmunition` クラスは、すべての弾薬の基底クラスとして機能します。銃を発射した際に、このクラスのインスタンスが生成され、弾薬が飛ぶ処理を実行します。
+## 概要
 
-- **デフォルト設定**: コンストラクタでデフォルトのシーンコンポーネントとスタティックメッシュを設定し、弾薬の基本的な物理挙動を管理します。
-- **弾薬の物理挙動**: 銃を撃つと、弾薬に物理的なインパルスが加えられ、その力で弾が飛び出します。この処理は `BeginPlay` 関数内で実行されます。
+`AWeaponAmmunition` は発射時にスポーンされる**薬莢（排莢）アクター**です。  
+`BeginPlay` で物理シミュレーションを有効にし、プレイヤーの右方向にランダムな力を加えて飛ばします。
 
-## このクラスのソースコードの説明
+## スポーン元
 
-### コンストラクタ (`AWeaponAmmunition::AWeaponAmmunition`)
+| スポーン元 | 条件 |
+|---|---|
+| `GUNMANCharacter::AnimationAtFiring` | TPS モードで発射したとき（`EquippedWeaponInfo.AmmunitionClass` のクラスを使用） |
+| `AAIEnemy::AttackCharacter_Implementation` | 敵が攻撃したとき（`EquippedWeaponInformation.AmmunitionClass` のクラスを使用） |
 
-- **DefaultSceneRoot**:
-  - `USceneComponent` を作成し、弾薬オブジェクトの基底コンポーネントとして設定しています。このコンポーネントはオブジェクト全体のルートコンポーネントとなります。
+## コンポーネント一覧
 
-- **StaticMesh**:
-  - `UStaticMeshComponent` を作成し、弾薬の見た目となるメッシュを定義します。このメッシュコンポーネントは `DefaultSceneRoot` にアタッチされています。
+| コンポーネント | 型 | 説明 |
+|---|---|---|
+| `DefaultSceneRoot` | `USceneComponent` | ルートコンポーネント |
+| `StaticMesh` | `UStaticMeshComponent` | 薬莢の外観メッシュ。`DefaultSceneRoot` の子 |
 
-### `BeginPlay` 関数
+## 関数の説明
 
-- **プレイヤーへのアクセス**:
-  - `UGameplayStatics::GetPlayerCharacter` を使って、プレイヤーキャラクターを取得します。これはゲーム内で弾薬が発射される際に、プレイヤーを基準に処理を行うためです。  
-	
-	※ 敵AI（`AIEnemy`）の場合はそのクラスの攻撃処理（`AAIEnemy::AttackCharacter_Implementation`）で弾薬を生成しています。
+### `AWeaponAmmunition()` コンストラクタ
 
-- **弾薬に力を加える**:
-  - `UKismetMathLibrary::RandomFloatInRange` を用いて、弾薬にランダムな強さのインパルス（力）を与えます。ここでは、ランダムな値（1.0から5.0の範囲）を使用して、弾薬が発射されたときに不規則な飛び方をさせています。
-  
-- **物理シミュレーションの有効化**:
-  - `StaticMesh->SetSimulatePhysics(true)` によって、弾薬のメッシュに物理シミュレーションを有効にします。これにより、弾薬が現実的な物理挙動で飛び出します。
+`DefaultSceneRoot` → `StaticMesh` の順でコンポーネントを生成します。  
+物理シミュレーションはまだ有効にしません（`BeginPlay` で有効化）。
 
-- **インパルスを加える**:
-  - `StaticMesh->AddImpulse(Impulse)` で、生成したインパルスを弾薬に加えます。この処理によって、弾薬が物理的に飛ばされる動作が実現されます。
+### `BeginPlay()`
+
+```mermaid
+flowchart TD
+    A["GetPlayerCharacter で Player を取得"]
+    A --> B{Player 取得成功?}
+    B -- No --> Z["何もしない"]
+    B -- Yes --> C["Impulse = Player->GetActorRightVector()\n× RandomFloatInRange(1.0, 5.0)"]
+    C --> D["StaticMesh->SetSimulatePhysics(true)"]
+    D --> E["StaticMesh->AddImpulse(Impulse)"]
+```
+
+- **インパルス方向**: プレイヤーの**右方向ベクトル**（`GetActorRightVector`）
+- **インパルス大きさ**: 1.0〜5.0 のランダム値を右方向ベクトルにスカラー倍
+
+> プレイヤーの向きによって薬莢の飛ぶ方向が変わるため、自然な排莢演出になっています。  
+> FPS モード（`AnimationAtFiring` の FPS 分岐）では `WeaponAmmunition` はスポーンされません。

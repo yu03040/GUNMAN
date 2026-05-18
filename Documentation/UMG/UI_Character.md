@@ -1,28 +1,53 @@
 # UICharacter クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/UMG/UICharacter.h / .cpp`  
+Blueprint: `WBP_UICharacter`
 
-![UI_Character_After](Images/UI_Character_After.png)
+## 概要
 
-`UICharacter` クラスは、プレイヤーキャラクターの体力倒した敵の数を画面上に表示するためのUIウィジェットクラスです。このクラスの主な役割は、プレイヤーの体力を示す `ProgressBar` と、敵を倒した数を表示する `TextBlock` にリアルタイムで値をバインドすることです。プレイヤーが敵を一定数倒すと、特定のUIアニメーションを再生する機能も備えています。
+`UUICharacter` はプレイヤーの**体力バー**と**撃破数**を画面左上に表示する HUD ウィジェットです。  
+`GUNMANCharacter::BeginPlay` で生成され、`AddToViewport` されます。
+
+## ウィジェットコンポーネント
+
+| コンポーネント | 型 | 役割 |
+|---|---|---|
+| `Health_ProgressBar` | `UProgressBar` | プレイヤーの体力割合を表示（`PercentDelegate` バインド） |
+| `Kill_TextBlock` | `UTextBlock` | "KILL" などのラベルテキスト |
+| `KillCount_TextBlock` | `UTextBlock` | 撃破数の数値を表示（`TextDelegate` バインド） |
+| `MoveKillCount` | `UWidgetAnimation` | 撃破数テキストのアニメーション（`BindWidgetAnim`） |
 
 ## 関数の説明
 
-### Initialize 関数
+### `Initialize()`
 
-`Initialize` 関数は、ウィジェットが初期化される際に呼び出されます。`Super::Initialize()` の結果が `false` だった場合、処理を中断して `false` を返す仕組みになっています。ウィジェットが正常に初期化されると、`KillCount_TextBlock` の `TextDelegate` と `Health_ProgressBar` の `PercentDelegate` にそれぞれ、`SetKillCountText` と `SetHealthProgressBar` という関数をバインドします。これにより、UI要素が更新されるたびにこれらの関数が呼び出され、リアルタイムでUIに反映されます。
+ウィジェット初期化時に呼ばれます。
 
-### SetKillCountText 関数
+- `KillCount_TextBlock->TextDelegate` に `SetKillCountText` をバインド
+- `Health_ProgressBar->PercentDelegate` に `SetHealthProgressBar` をバインド
 
-この関数は、プレイヤーが倒した敵の数を `KillCount_TextBlock` に表示するために使用されます。`UGameplayStatics::GetPlayerCharacter` を使用してプレイヤーキャラクターの参照を取得し、それを `AGUNMANCharacter` にキャストします。
+Delegate バインドにより、`SetKillCountText` と `SetHealthProgressBar` は毎フレーム自動で呼ばれます。
 
-- プレイヤーが敵を倒した数 (`KillCount`) を取得し、5体ごとに特定のアニメーション (`MoveKillCount`) を再生します。
-- アニメーションが再生された後、または再生条件が満たされていない場合に、敵を倒した数をテキストに変換して返します。
-- プレイヤーキャラクターが取得できなかった場合、空のテキスト (`FText()`) を返します。
+### `SetKillCountText()`
 
-### SetHealthProgressBar 関数
+`GUNMANCharacter::GetKillCount()` で撃破数を取得し、`KillCount_TextBlock` に表示します。
 
-この関数は、プレイヤーの体力を示す `ProgressBar` に表示する割合を計算するために使用されます。`SetKillCountText` と同様に、`UGameplayStatics::GetPlayerCharacter` を使用してプレイヤーキャラクターの参照を取得し、`AGUNMANCharacter` にキャストします。
+アニメーション再生条件：
 
-- プレイヤーの現在の体力の割合 (`GetHealthPercent()`) を取得し、それを `ProgressBar` に表示するために返します。
-- プレイヤーキャラクターが取得できなかった場合、`0.0f` を返します。
+```
+KillCount % 5 == 4 かつ KillCount != 0
+```
+
+| KillCount | 条件 | 動作 |
+|---|---|---|
+| 4 | `4 % 5 == 4` ✓ | `PlayAnimation(MoveKillCount)` |
+| 5 | `5 % 5 == 0` ✗ | アニメーションなし |
+| 9 | `9 % 5 == 4` ✓ | `PlayAnimation(MoveKillCount)` |
+| 14 | `14 % 5 == 4` ✓ | `PlayAnimation(MoveKillCount)` |
+
+つまり **4・9・14・19…** のタイミングで再生されます（5 の倍数になる直前のキル）。
+
+### `SetHealthProgressBar()`
+
+`GUNMANCharacter::CalcHealthPercent()`（= `CurrentHealth / MaxHealth`）の値を `Health_ProgressBar` に返します。  
+プレイヤーが取得できない場合は `0.0f` を返します。

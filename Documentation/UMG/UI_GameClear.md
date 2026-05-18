@@ -1,27 +1,36 @@
-# UIGameClear クラスクラスの概要
+# UIGameClear クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/UMG/UIGameClear.h / .cpp`  
+Blueprint: `WBP_GameClear`
 
-![UI_GameClear](Images/UI_GameClear.png)  
-![Level_ClassDiagrams](Images/Level_ClassDiagrams.png)
+## 概要
 
-`UIGameClear` クラスは、ゲームクリア画面を表示するためのUIウィジェットクラスです。このクラスには、次の2つのボタンが含まれています。
+`UUIGameClear` はゲームクリア画面のウィジェットです。  
+`AGameClearMapScript::BeginPlay` で生成・表示されます。  
+ボタンの背景色変更は `AGameClearMapScript::ChangeButtonColor` が Getter 経由で直接操作します。
 
-1. **ゲームを続けるボタン**: タイトル画面に戻る。
-2. **ゲームを終了するボタン**: ゲームを終了する。
+## ウィジェットコンポーネント
 
-このクラスでは、ボタンクリック時の処理を関数として実装しています。そして、これらの処理は `LevelScriptActor` を継承した `BaseMapScript` クラスを基底クラスとし、そのクラスを継承したゲームクリアマップ用の `GameClearMapScript` クラスで呼び出すことが可能です。
+| コンポーネント | 型 | 役割 |
+|---|---|---|
+| `Continue_Button` | `UButton` | タイトルへ戻るボタン |
+| `Continue_TextBlock` | `UTextBlock` | Continue ボタンのラベル |
+| `GameEnd_Button` | `UButton` | ゲーム終了ボタン |
+| `GameEnd_TextBlock` | `UTextBlock` | ゲーム終了ボタンのラベル |
+
+## Getter 一覧
+
+`AGameClearMapScript::ChangeButtonColor` が選択状態のボタン色を変更するために使用します。
+
+| 関数 | 戻り値 |
+|---|---|
+| `GetContinue_Button()` | `UButton*` |
+| `GetGameEnd_Button()` | `UButton*` |
 
 ## 関数の説明
 
-### OnClickedContinue_Button 関数
+### `OnClickedContinue_Button()`
+`UGameplayStatics::OpenLevel(this, "TitleMap")` でタイトルマップへ遷移します。
 
-この関数は、ゲームを続けるボタンがクリックされた際に呼び出されます。
-
-- `UGameplayStatics::OpenLevel` 関数を使用して、"TitleMap" という名前のレベル（タイトル画面）をロードし、ゲームを再開します。この処理により、プレイヤーはゲームのタイトル画面に戻ることができます。
-
-### OnClickedGameEnd_Button 関数
-
-この関数は、ゲーム終了ボタンがクリックされた際に呼び出されます。
-
-- `UKismetSystemLibrary::QuitGame` 関数を使用してゲームを終了します。`EQuitPreference::Quit` を指定することで、プレイヤーがゲームを完全に終了できるようにしています。
+### `OnClickedGameEnd_Button()`
+`UKismetSystemLibrary::QuitGame(this, NULL, EQuitPreference::Quit, false)` でアプリを終了します。

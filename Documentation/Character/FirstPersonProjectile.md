@@ -1,40 +1,40 @@
 # FirstPersonProjectile クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/SpawnActors/FirstPersonProjectile.h / .cpp`
 
-![FirstPersonProjectile](Images/FirstPersonProjectile.png)
-![FirstPersonProjectile_ClassDiagram](Images/FirstPersonProjectile_ClassDiagram.png)
+## 概要
 
-`AFirstPersonProjectile` クラスは、Unreal Engine の `AActor` クラスを継承して、`GUNMANCharacter` の一人称視点で使用する弾丸（プロジェクタイル）を表現しています。  
-`BP_FirstPersonProjectile` は `AFirstPersonProjectile` クラス を継承してたクラスです。  
-このクラスの主な特徴は次の通りです。
+`AFirstPersonProjectile` は `AActor` を継承した、FPS モード専用の弾丸（プロジェクタイル）アクターです。  
+`BP_FirstPersonProjectile` はこのクラスを継承した Blueprint クラスです。
 
-- **コンポーネントの作成とプロパティの設定**:
-  - `USphereComponent` を使用して、弾丸の衝突判定を表すシンプルな球体コリジョンを作成しています。
-  - `UProjectileMovementComponent` により、弾丸の移動挙動を制御します（初速度やバウンドの設定など）。
-- **衝突イベントの処理**:
-  - `OnComponentHit` イベントに対して `OnHit` 関数をバインドし、何かに衝突した際に処理を行います。
-- **デフォルトの設定**:
-  - 弾丸は3秒後に自動で消滅します（`InitialLifeSpan`）。
+- 球体コリジョン（`USphereComponent`）で衝突判定
+- `UProjectileMovementComponent` で飛翔・バウンドを制御
+- 衝突時に物理オブジェクトへの衝撃を与えて自爆
+- 生成から 3 秒後に自動消滅
 
-## このクラスのソースコードの説明
+## コンポーネント一覧
 
-### コンストラクター（`AFirstPersonProjectile::AFirstPersonProjectile`）
-- **CollisionComp の設定**:
-  - `USphereComponent` を作成し、半径を 5.0f に設定しています。このコンポーネントは弾丸の衝突判定に使用されます。
-  - 衝突判定のプロファイルを "Projectile" に設定し、衝突イベント (`OnComponentHit`) を `OnHit` 関数にバインドしています。
-  - プレイヤーがこの弾丸の上を歩けないようにするため、`SetWalkableSlopeOverride` で歩行可能な傾斜を無効にし、`CanCharacterStepUpOn` を `ECB_No` に設定しています。
-  - このコンポーネントをルートコンポーネントとして設定します。
+| コンポーネント | 型 | 説明 |
+|---|---|---|
+| `CollisionComp` | `USphereComponent` | 衝突判定用の球体（半径 12.5）。ルートコンポーネント |
+| `ProjectileMovement` | `UProjectileMovementComponent` | 飛翔制御。初速・最大速度 3000、バウンドあり |
 
-- **ProjectileMovement の設定**:
-  - `UProjectileMovementComponent` を作成し、弾丸の移動を管理します。`UpdatedComponent` を `CollisionComp` に設定し、弾丸の初速度と最大速度を 3000.f に設定しています。
-  - `bRotationFollowsVelocity` を `true` にすることで、弾丸が飛んでいる方向に回転するようにしています。また、`bShouldBounce` を `true` にして弾丸がバウンドするように設定しています。
+## 関数の説明
 
-- **初期ライフスパンの設定**:
-  - 弾丸は3秒後に自動で消滅するように、`InitialLifeSpan` を 3.0f に設定しています。
+### `AFirstPersonProjectile()` コンストラクタ
 
-### `OnHit` 関数
-- **衝突イベントの処理**:
-  - `OnHit` 関数は弾丸が何かに衝突した際に呼び出されます。
-  - 衝突したオブジェクトが物理演算をシミュレートしている場合（`OtherComp->IsSimulatingPhysics()`）、そのオブジェクトに弾丸の速度に応じた衝撃（`AddImpulseAtLocation`）を加えます。
-  - その後、弾丸自体を破壊します（`Destroy()`）。
+| 設定 | 値 |
+|---|---|
+| 球体コリジョン半径 | 12.5f |
+| コリジョンプロファイル | `"Projectile"` |
+| 初速度 / 最大速度 | 3000.0f |
+| `bRotationFollowsVelocity` | true（飛行方向に回転） |
+| `bShouldBounce` | true（バウンドあり） |
+| `InitialLifeSpan` | 3.0f（3 秒後に自動消滅） |
+
+### `OnHit()`
+
+弾丸が何かに衝突したときに `OnComponentHit` から呼ばれます。
+
+1. 衝突相手が物理シミュレーション中（`IsSimulatingPhysics()`）の場合、`GetVelocity() * 100.0f` のインパルスを与える
+2. `Destroy()` で弾丸を消滅させる

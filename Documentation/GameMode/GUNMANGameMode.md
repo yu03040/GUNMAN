@@ -1,39 +1,64 @@
 # GUNMANGameMode クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/GameModes/GUNMANGameMode.h / .cpp`
 
-![GameMode_ClassDiagram](Images/GameMode_ClassDiagram.png)  
+## 概要
 
-`AGUNMANGameMode` クラスは、`AGUNMANGameModeBase` を継承した、**バトルマップ専用のゲームモード**です。このクラスでは以下の主要な機能を提供します。
+`AGUNMANGameMode` は `AGUNMANGameModeBase` を継承した**バトルマップ専用の GameMode** です。  
+制限時間の管理・クリア/オーバー判定・シーン遷移の 3 つを担います。
 
-- **Tickの設定**: コンストラクターで毎フレーム `Tick()` を呼び出すように設定。
-- **プレイヤーの初期設定**: デフォルトのポーンおよびプレイヤーコントローラーのクラスを指定。
-- **制限時間管理**: 制限時間をウィジェットで表示し、経過時間に応じてゲームの勝敗を判断。
-- **ゲームの勝敗条件の設定**: 敵を一定数倒すとゲームクリア、制限時間が切れるとゲームオーバー。  
-※ プレイヤーキャラクターが死んだときは `GUNMANCharacter` クラスからの処理
+> プレイヤーの体力が 0 になったときのゲームオーバー遷移は `GUNMANCharacter::HandleAnyDamage` が処理します。
 
-このクラスは、バトルの進行状況や時間制限に基づくゲームプレイ管理を行い、特定の条件に応じてマップを変更するなど、バトルゲームにおけるゲームロジックを構築しています。
+## プロパティ一覧
 
-## このクラスのソースコードの説明
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `GameClearKillCount` | `int` | 10 | ゲームクリアに必要な撃破数 |
+| `GameOverTime` | `float` | 0.0 | 残り時間がこの値以下になるとゲームオーバー |
+| `GameClearWaitingTime` | `float` | 2.0 | クリア判定後、シーン遷移するまでの待機秒数 |
+| `UITimeLimitRef` | `UUITimeLimitWidget*` | — | タイマー UI の参照（`DisplayTimeLimit` で生成） |
 
-### コンストラクター `AGUNMANGameMode::AGUNMANGameMode()`
-- **Tickの設定**: `PrimaryActorTick.bStartWithTickEnabled = true` と `PrimaryActorTick.bCanEverTick = true` によって、毎フレーム `Tick()` 関数が呼び出されるように設定されています。
-- **プレイヤーポーンの設定**: `FClassFinder<APawn>` を使って、`ThirdPersonCharacter` ブループリントをデフォルトのポーンとして設定しています。
-- **プレイヤーコントローラーの設定**: `PlayerControllerClass` を `AGUNMANController::StaticClass()` に初期化しています。
+## 関数の説明
 
-### `BeginPlay()` 関数
-- **制限時間ウィジェットの表示**: `DisplayTimeLimit()` 関数を呼び出して、制限時間を表示するウィジェットを画面に追加します。
+### `AGUNMANGameMode()` コンストラクタ
 
-### `Tick` 関数
-- **制限時間の管理**: 制限時間ウィジェット (`UITimeLimitRef`) を使って、残り時間を更新しています。残り時間が `GameOverTime` 以下になると、ゲームオーバーとして `OpenGameOverMap()` を呼び出します。
-- **ゲームクリア条件の判定**: プレイヤーキャラクターの `KillCount` が `GameClearKillCount` に達すると、`OpenGameClearMap()` 関数を一定時間後に呼び出して、ゲームクリア画面に移行します。
+1. `PrimaryActorTick.bCanEverTick = true` — 毎フレーム `Tick` を呼ぶ
+2. `DefaultPawnClass` に `ThirdPersonCharacter` Blueprint を設定
+3. `PlayerControllerClass` に `AGUNMANController` を設定
 
-### `DisplayTimeLimit` 関数
-- **ウィジェットクラスの取得**: 制限時間を表示するために、指定したブループリント `WBP_TimeLimit` のクラスを同期的にロードします。
-- **ウィジェットの作成と表示**: プレイヤーコントローラーを取得し、制限時間ウィジェットを作成して画面に表示します。
+### `BeginPlay()`
 
-### `OpenGameClearMap` 関数
-- **ゲームクリア時のマップ遷移**: `UGameplayStatics::OpenLevel` を使って、ゲームクリアマップ (`GameClearMap`) を開きます。
+`DisplayTimeLimit()` を呼び出してタイマー UI を生成・表示します。
 
-### `OpenGameOverMap` 関数
-- **ゲームオーバー時のマップ遷移**: `UGameplayStatics::OpenLevel` を使って、ゲームオーバーマップ (`GameOverMap`) を開きます。
+### `Tick(float DeltaTime)`
+
+毎フレーム以下の処理を実行します。
+
+```mermaid
+flowchart TD
+    A["残り時間を減算\nTimeLimitRef->SetTime(Time - DeltaTime)"]
+    A --> B{残り時間 <= 0.0 ?}
+    B -- Yes --> C["OpenGameOverMap()"]
+    B -- No  --> D["プレイヤーの KillCount を取得"]
+    D --> E{KillCount >= 10 ?}
+    E -- Yes --> F["SetTimer(2.0s) → OpenGameClearMap()"]
+    E -- No  --> G["次のフレームへ"]
+```
+
+- 残り時間は `UITimeLimitRef->GetTime() - DeltaTime` で毎フレーム減算
+- `GetTime() <= GameOverTime`（0.0）になると即座に `OpenGameOverMap()`
+- `KillCount >= GameClearKillCount`（10）になると `GameClearWaitingTime`（2.0 秒）後に `OpenGameClearMap()`
+
+### `DisplayTimeLimit()`
+
+`WBP_TimeLimit` Blueprint を `TSoftClassPtr::LoadSynchronous` で同期ロードし、  
+`CreateWidget` でインスタンスを生成して `AddToViewport` に追加します。  
+生成した参照を `UITimeLimitRef` に保持し、`Tick` からタイマー値の読み書きに使います。
+
+### `OpenGameClearMap()`
+
+`UGameplayStatics::OpenLevel(GetWorld(), "GameClearMap")` でクリア画面へ遷移します。
+
+### `OpenGameOverMap()`
+
+`UGameplayStatics::OpenLevel(GetWorld(), "GameOverMap")` でゲームオーバー画面へ遷移します。

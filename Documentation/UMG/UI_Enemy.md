@@ -1,27 +1,32 @@
 # UIEnemy クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/UMG/UIEnemy.h / .cpp`
 
-![UI_Enemy](Images/UI_Enemy.png)
+## 概要
 
-`UIEnemy` クラスは、敵キャラクターの体力を表示するためのUIウィジェットクラスです。このクラスの主な役割は、敵キャラクターの体力を示す `ProgressBar` にリアルタイムで体力の割合をバインドすることです。また、このクラスは `OwningEnemy` という変数を持ち、その敵キャラクターの体力を参照してUIを更新します。
+`UUIEnemy` は敵キャラクター頭上に表示する体力バーウィジェットです。  
+`AAIEnemy` の `Widget`（`UWidgetComponent`）に設定され、`AAIEnemy::BeginPlay` で `SetOwningEnemy(this)` が呼ばれて参照先が確定します。
+
+## ウィジェットコンポーネント
+
+| コンポーネント | 型 | 役割 |
+|---|---|---|
+| `Health_ProgressBar` | `UProgressBar` | 敵の体力割合を表示（`PercentDelegate` バインド） |
+| `OwningEnemy` | `AAIEnemy*` | 体力を参照する対象の敵（`SetOwningEnemy` で設定） |
 
 ## 関数の説明
 
-### Initialize 関数
+### `Initialize()`
 
-`Initialize` 関数は、ウィジェットが初期化される際に呼び出されます。`Super::Initialize()` の結果が `false` であった場合、処理を中断して `false` を返します。ウィジェットが正常に初期化された場合は、`Health_ProgressBar` の `PercentDelegate` に `SetHealthProgressBar` 関数をバインドします。これにより、`ProgressBar` が更新されるたびに `SetHealthProgressBar` 関数が呼び出され、敵の体力の割合が表示されるようになります。
+`Health_ProgressBar->PercentDelegate` に `SetHealthProgressBar` をバインドします。  
+Delegate バインドにより毎フレーム自動で体力割合が更新されます。
 
-### SetHealthProgressBar 関数
+### `SetHealthProgressBar()`
 
-この関数は、`ProgressBar` に表示する敵の体力の割合を計算するために使用されます。
+`OwningEnemy->GetHealthPercent()` の値を返します。  
+`OwningEnemy` が未設定の場合は `0.0f` を返します。
 
-- `OwningEnemy` が設定されている場合、`GetHealthPercent` 関数を呼び出して、その体力の割合を返します。
-- `OwningEnemy` が設定されていない場合、`0.0f` を返し、`ProgressBar` は空の状態となります。
+### `SetOwningEnemy(TObjectPtr<AAIEnemy> NewOwner)`
 
-### SetOwningEnemy 関数
-
-この関数は、`OwningEnemy` 変数に新しい敵キャラクターを設定します。
-
-- `NewOwner` には `AAIEnemy` クラスのオブジェクトが渡され、これを `OwningEnemy` として保存します。
-- この設定により、`SetHealthProgressBar` 関数で適切な敵キャラクターの体力を表示することが可能になります。
+`OwningEnemy` に `NewOwner` を設定します。  
+`AAIEnemy::BeginPlay` から呼ばれます。

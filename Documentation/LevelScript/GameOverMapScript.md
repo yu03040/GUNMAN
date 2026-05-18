@@ -1,38 +1,60 @@
 # GameOverMapScript クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/LevelScript/GameOverMapScript.h / .cpp`
 
-![Level_ClassDiagrams](Images/Level_ClassDiagrams.png)
+## 概要
 
-`AGameOverMapScript` は、`LevelScriptActor` および `BaseMapScript` を継承したゲームオーバーマップ専用のクラスです。このクラスでは、ゲームオーバー画面の管理と操作が行われ、以下の機能を提供します。
+`AGameOverMapScript` は `ABaseMapScript` を継承した**ゲームオーバー画面専用の LevelScript** です。  
+`AGameClearMapScript` と同一の構造で、対象ウィジェットのみが異なります。
 
-- **プロパティのデフォルト設定**: コンストラクターで `MaxButtonCounter` や `InvalidButtonIndex` などのプロパティが設定される。
-- **Enhanced Input** のロード: `InputAction` と `InputMappingContext` を使用してゲームオーバーマップ用の入力システムを構築。
-- **ウィジェットの表示**: `UIGameOver` ウィジェットが表示され、ユーザーにゲームオーバーの選択肢を提供。
-- **仮想関数のオーバーライド**:
-  - **ボタン色の変更**: 選択されたボタンの色を変更。
-  - **クリックイベントの処理**: ボタンが選択された際にイベントを発生させる。
+クラス継承図は [BaseMapScript](BaseMapScript.md) を参照してください。
+
+## プロパティ一覧
+
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `UI_GameOver` | `UUIGameOver*` | null | ゲームオーバー画面ウィジェットの参照 |
+| `DefaultMappingContext` | `UInputMappingContext*` | `IMC_OperatingUI` | UI 操作用の入力マッピング |
+| `EnterAction` | `UInputAction*` | `IA_Enter` | 決定アクション |
+| `DownArrowKeyAction` | `UInputAction*` | `IA_DownArrowKey` | 下移動アクション |
+| `UpArrowKeyAction` | `UInputAction*` | `IA_UpArrowKey` | 上移動アクション |
+| `MaxButtonCounter` | `int` | 2 | ボタン数 |
+| `InvalidButtonIndex` | `int` | 3 | 範囲外インデックス |
+
+## ボタンインデックスと対応
+
+| ButtonCounter | ボタン | 処理 |
+|---|---|---|
+| 1 | Continue（タイトルへ） | `OnClickedContinue_Button()` → TitleMap へ遷移 |
+| 2 | Game End | `OnClickedGameEnd_Button()` → アプリ終了 |
+
+## 入力アクション一覧
+
+| InputAction | トリガー | コールバック |
+|---|---|---|
+| `IA_Enter` | Triggered | `UpdateOutputButton` |
+| `IA_DownArrowKey` | Triggered | `UI_DownwardMovement` |
+| `IA_UpArrowKey` | Triggered | `UI_UpwardMovement` |
 
 ## 関数の説明
 
-### コンストラクター（`AGameOverMapScript::AGameOverMapScript`）
-- `UI_GameOver`, `MaxButtonCounter`, `InvalidButtonIndex` などのデフォルトプロパティが設定される。
-- `Enhanced Input` のアセット (`InputMappingContext`, `InputAction`) を `ConstructorHelpers::FObjectFinder` を使用してロード。
+### `AGameOverMapScript()` コンストラクタ
+- `MaxButtonCounter = 2`、`InvalidButtonIndex = 3`
+- `IMC_OperatingUI` / `IA_Enter` / `IA_DownArrowKey` / `IA_UpArrowKey` をロード
 
-### `BeginPlay` 関数
-- 親クラスの `BeginPlay` を呼び出した後、以下の初期化処理が行われる:
-  1. **プレイヤーコントローラーの取得**: `UGameplayStatics::GetPlayerController` を使ってプレイヤーのコントローラーを取得。
-  2. **マッピングコンテキストの追加**: `UEnhancedInputLocalPlayerSubsystem` を介して `DefaultMappingContext` をサブシステムに追加。
-  3. **ウィジェットのセットアップ**: `WidgetClass` をブループリントから生成し、ゲームオーバーウィジェット (`UIGameOver`) を作成してビューポートに追加。
-  4. **入力モードの設定**: プレイヤーの入力モードをゲームパッド操作用に設定。
-  5. **初期ボタンの選択状態**: `Continue` ボタンを選択状態に設定し、背景色を `SelectedColor` に変更。
+### `BeginPlay()`
+1. `IMC_OperatingUI` を `EnhancedInputLocalPlayerSubsystem` に追加
+2. `SetupInput` で入力アクションをバインド
+3. `WBP_GameOver` を同期ロードして `UUIGameOver` ウィジェットを生成・`AddToViewport`
+4. `SetInputMode(FInputModeGameOnly)` でゲームパッド操作を有効化
+5. `Continue` ボタンを `SelectedColor` で初期選択状態にする
 
-### `SetupInput` 関数
-- **入力バインディングの設定**:
-  - `EnhancedInputComponent->BindAction` によって、`EnterAction`, `DownArrowKeyAction`, `UpArrowKeyAction` がそれぞれの処理 (`UpdateOutputButton`, `UI_DownwardMovement`, `UI_UpwardMovement`) にバインドされる。
+### `SetupInput(TObjectPtr<UInputComponent>)`
+`EnhancedInputComponent` に Enter・Down・Up アクションをバインドします。
 
-### `ChangeButtonColor` 関数
-- ボタンの選択状態に基づいて、背景色を変更する処理を行う。`ButtonCounter` の値に応じて、`ContinueButton` または `EndButton` の色が `SelectedColor` に変わる。
+### `ChangeButtonColor()`
+`Continue` ボタンと `GameEnd` ボタンを白にリセットしてから、`ButtonCounter` に対応するボタンを `SelectedColor` にします。
 
-### `UpdateOutputButton` 関数
-- 選択されたボタンに応じて、`UI_GameOver->OnClickedContinue_Button` または `UI_GameOver->OnClickedGameEnd_Button` のクリックイベントを発生させる。
+### `UpdateOutputButton()`
+`ButtonCounter == 1` なら `OnClickedContinue_Button()`（TitleMap 遷移）、  
+`ButtonCounter == 2` なら `OnClickedGameEnd_Button()`（アプリ終了）を呼び出します。

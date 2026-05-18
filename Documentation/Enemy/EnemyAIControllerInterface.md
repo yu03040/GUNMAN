@@ -1,18 +1,35 @@
 # EnemyAIControllerInterface クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/Enemy/EnemyAIControllerInterface.h / .cpp`
 
-`EnemyAIControllerInterface` クラスは、敵AIのコントローラーに関する動作を定義するためのインターフェースです。このインターフェースは、敵AIの目標（ターゲット）の更新や視界情報を処理する関数を宣言しており、これらの関数はこのインターフェースを継承するクラスで具体的に実装されます。
+## 概要
 
-- **インターフェースの役割**: 敵AIの目標アクターの更新や、敵が視界内にターゲットを捉えたかどうかの状態管理を行う処理を統一して提供します。
-- **実装の分離**: 処理内容はこのクラスでは宣言のみで、実際の処理はこのインターフェースを継承したクラスで実装されます。これにより、複数のAIコントローラーがこのインターフェースを共有でき、一貫した動作を行うことが可能です。
+`IEnemyAIControllerInterface` は AI コントローラーへの Blackboard 更新命令を抽象化するインターフェースです。  
+`BlueprintNativeEvent` として宣言されており、C++ と Blueprint の両方で実装できます。  
+`AAIEnemyController` と `AAIEnemy` の両方が実装します。
+
+## クラス図
+
+```mermaid
+classDiagram
+    class IEnemyAIControllerInterface {
+        <<interface>>
+        +UpdateTargetActorKey(AActor* TargetActor)
+        +UpdateHasLineOfSightKey(bool HasLineOfSight)
+    }
+    IEnemyAIControllerInterface <|.. AAIEnemyController : implements
+    IEnemyAIControllerInterface <|.. AAIEnemy : implements
+```
 
 ## 関数の説明
 
-### `UpdateTargetActorKey` 関数
-- 敵AIが追跡や攻撃対象とするアクターの情報を更新するために使用されます。引数として `AActor*` 型の `TargetActor` を受け取り、ターゲットアクターの更新処理を行います。この関数は `BlueprintNativeEvent` として定義されているため、ブループリントとC++の両方で実装することが可能です。
+### `UpdateTargetActorKey(AActor* TargetActor)`
 
-### `UpdateHasLineOfSightKey()` 関数
-- 敵 AI が視界内にターゲットを捉えたかどうかを判断するフラグを更新するために使用されます。引数として `bool` 型の `HasLineOfSight` を受け取り、敵がターゲットを視認できているかどうかを更新します。こちらも `BlueprintNativeEvent` として宣言されているため、実装はブループリントとC++の両方で行うことが可能です。
+追跡対象のアクターを Blackboard キー `"TargetActor"` に設定します。  
+`AAIEnemyController::PerceptionUpdated` でプレイヤーを検知したときに呼ばれます。  
+`TargetLost` から `nullptr` を渡すことで追跡を解除します。
 
-これらの関数により、AIのターゲットや視界情報を動的に変更し、敵のAI挙動を細かく制御することができます。
+### `UpdateHasLineOfSightKey(bool HasLineOfSight)`
+
+視界内にターゲットがいるかを Blackboard キー `"HasLIneOfSight"` に設定します（※ソース上のスペルミス "LIne"）。  
+`AAIEnemyController::PerceptionUpdated` でプレイヤーの視界状態が変化したときに呼ばれます。

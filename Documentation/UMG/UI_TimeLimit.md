@@ -1,20 +1,60 @@
 # UITimeLimitWidget クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/UMG/UITimeLimitWidget.h / .cpp`  
+Blueprint: `WBP_TimeLimit`
 
-![UI_TimeLimit](Images/UI_TimeLimit.png)
+## 概要
 
-`UITimeLimitWidget` クラスは、ゲームの制限時間を表示するためのUIウィジェットクラスです。このクラスの主な役割は、ゲームの残り時間をリアルタイムで更新し、その時間を表示する `TextBlock` にバインドすることです。
+`UUITimeLimitWidget` はゲームの残り時間を表示するタイマーウィジェットです。  
+`AGUNMANGameMode::BeginPlay` で生成・表示され、`Tick` から `SetTime` で毎フレーム時間が減算されます。
+
+## ウィジェットコンポーネント
+
+| コンポーネント | 型 | 役割 |
+|---|---|---|
+| `TimeLimit_TextBlock` | `UTextBlock` | "TIME" などのラベルテキスト（静的表示） |
+| `TimeRemoving_TextBlock` | `UTextBlock` | カウントダウン値を表示（`TextDelegate` バインド） |
+
+## プロパティ
+
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `TimeLimitSeconds` | `float` | **120.0** | 残り時間（秒）。2 分がデフォルト |
 
 ## 関数の説明
 
-### Initialize 関数
+### `Initialize()`
 
-`Initialize` 関数は、ウィジェットが初期化される際に呼び出されます。`Super::Initialize()` 関数の結果を確認し、`false` が返された場合は処理を中断して `false` を返します。ウィジェットが正常に初期化されると、`TimeRemoving_TextBlock` の `TextDelegate` に `SetTextBlockUpdateTimeLimit` 関数をバインドします。これにより、時間が更新されるたびに `TextBlock` に表示されるテキストが更新されます。
+`TimeRemoving_TextBlock->TextDelegate` に `SetTextBlockUpdateTimeLimit` をバインドします。  
+これにより `GUNMANGameMode::Tick` で `SetTime` を呼ぶだけで表示が自動更新されます。
 
-### SetTextBlockUpdateTimeLimit 関数
+### `SetTextBlockUpdateTimeLimit()`
 
-この関数は、制限時間を `TextBlock` に表示するために使用されます。
+`UKismetMathLibrary::Round(TimeLimitSeconds)` で四捨五入した整数値をテキストに変換して返します。  
+`TimeRemoving_TextBlock` の `TextDelegate` から毎フレーム呼ばれます。
 
-- `UKismetMathLibrary::Round` を使って `TimeLimitSeconds` を四捨五入し、その整数値を `UKismetTextLibrary::Conv_IntToText` 関数でテキストに変換して返します。
-- これにより、ゲームの残り時間が `TextBlock` にリアルタイムで表示されます。
+### `GetTime() const`
+
+`TimeLimitSeconds` を返します。`AGUNMANGameMode::Tick` が残り時間の判定に使用します。
+
+### `SetTime(float time)`
+
+`TimeLimitSeconds = time` を設定します。  
+`AGUNMANGameMode::Tick` から `SetTime(GetTime() - DeltaTime)` として毎フレーム呼ばれ、時間を減算します。
+
+## GUNMANGameMode との連携
+
+```mermaid
+sequenceDiagram
+    participant GM as AGUNMANGameMode
+    participant W as UITimeLimitWidget
+
+    GM->>W: BeginPlay: AddToViewport()
+    loop 毎フレーム (Tick)
+        GM->>W: SetTime(GetTime() - DeltaTime)
+        W-->>GM: GetTime() ← 判定用に残り時間を取得
+        alt 残り時間 <= 0
+            GM->>GM: OpenGameOverMap()
+        end
+    end
+```

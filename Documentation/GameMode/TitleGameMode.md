@@ -1,12 +1,11 @@
 # TitleGameMode クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/GameModes/TitleGameMode.h / .cpp`
 
-![GameMode_ClassDiagram](Images/GameMode_ClassDiagram.png)  
+## 概要
 
-`ATitleGameMode` クラスは、基底クラス`AGUNMANGameModeBase` を継承した**タイトルマップ専用のゲームモードクラス**です。このクラスは、タイトル画面のゲームロジックやルールを制御するための基本的なフレームワークを提供します。
+`ATitleGameMode` は `AGUNMANGameModeBase` を継承した**タイトル画面専用の GameMode** です。  
+現時点では独自のプロパティ・関数は持たないスタブクラスです。  
+タイトル画面の UI 操作・入力処理は `ATitleMapScript`（LevelScript）が担当します。
 
-現在のところ、クラスは**将来的な拡張**のために定義されていますが、特定の機能や処理は実装されていません。このクラスは、ゲームのタイトル画面で必要となるロジック（UI処理、メニュー操作など）を実装する基盤となります。
-
-## 関数の説明
-
+クラス継承図は [GUNMANGameModeBase](GUNMANGameModeBase.md) を参照してください。

@@ -1,41 +1,47 @@
 # UITitle クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/UMG/UITitle.h / .cpp`  
+Blueprint: `WBP_Title`
 
-![UI_Title](Images/UI_Title.png)  
-![UI_Title_Tutorial](Images/UI_Title_Tutorial_v2.png)
-![Level_ClassDiagrams](Images/Level_ClassDiagrams.png)
+## 概要
 
-`UITitle` クラスは、ゲームのタイトルメニュー画面のUIウィジェットを担当するクラスです。このクラスは、次の3つのボタンを提供します。
+`UUITitle` はタイトル画面のメニューウィジェットです。  
+`ATitleMapScript::BeginPlay` で生成・表示され、ボタンの背景色変更は `ATitleMapScript` が Getter 経由で直接操作します。
 
-1. **ゲーム開始ボタン**: ゲームを開始する。
-2. **ゲーム終了ボタン**: ゲームを終了する。
-3. **?ボタン**: ゲームの操作方法を説明する画像を表示する。
+## ウィジェットコンポーネント
 
-このクラスでは、ボタンクリック時の処理が関数として実装されており、それぞれのボタンに対応した機能が実行されます。さらに、このクラスで行われる処理は、`LevelScriptActor` を継承した `BaseMapScript` クラスを基底クラスとして、そのクラスを継承した `TitleMapScript` クラスで呼び出すことができます。
+| コンポーネント | 型 | 役割 |
+|---|---|---|
+| `GameStart_Button` | `UButton` | ゲーム開始ボタン |
+| `GameStart_TextBlock` | `UTextBlock` | ゲーム開始ボタンのラベル |
+| `GameEnd_Button` | `UButton` | ゲーム終了ボタン |
+| `GameEnd_TextBlock` | `UTextBlock` | ゲーム終了ボタンのラベル |
+| `GameStartExplaination_Button` | `UButton` | 操作説明を開くボタン（?ボタン） |
+| `GameEndExplaination_Button` | `UButton` | 操作説明を閉じるボタン |
+| `Explaination_CanvasPanel` | `UCanvasPanel` | 操作説明画像を含むパネル |
+
+## Getter 一覧
+
+`ATitleMapScript::ChangeButtonColor` が選択状態のボタン色を変更するために使用します。
+
+| 関数 | 戻り値 | 用途 |
+|---|---|---|
+| `GetGameStart_Button()` | `UButton*` | GameStart ボタンの背景色変更 |
+| `GetGameEnd_Button()` | `UButton*` | GameEnd ボタンの背景色変更 |
+| `GetGameStartExplaination_Button()` | `UButton*` | ?ボタンの背景色変更 |
+| `GetGameEndExplaination_Button()` | `UButton*` | 操作説明を閉じるボタンの背景色変更 |
 
 ## 関数の説明
 
-### OnClickedGameStart_Button 関数
+### `OnClickedGameStart_Button()`
+`UGameplayStatics::OpenLevel(this, "BattleMap")` でバトルマップへ遷移します。
 
-この関数は、ゲーム開始ボタンがクリックされた際に呼び出されます。
+### `OnClickedGameEnd_Button()`
+`UKismetSystemLibrary::QuitGame(this, NULL, EQuitPreference::Quit, false)` でアプリを終了します。
 
-- `UGameplayStatics::OpenLevel` 関数を使用して、"BattleMap" という名前のレベルをロードし、ゲームを開始します。
+### `OnClickedGameStartExplaination_Button()`
+`Explaination_CanvasPanel->SetVisibility(ESlateVisibility::SelfHitTestInvisible)` で操作説明パネルを表示します。  
+`SelfHitTestInvisible` は見た目は表示しつつ、このパネル自体はヒットテストを受け付けません。
 
-### OnClickedGameEnd_Button 関数
-
-この関数は、ゲーム終了ボタンがクリックされた際に呼び出されます。
-
-- `UKismetSystemLibrary::QuitGame` 関数を使用してゲームを終了します。`EQuitPreference::Quit` を指定することで、プレイヤーがゲームを完全に終了できるようにしています。
-
-### OnClickedGameStartExplaination_Button 関数
-
-この関数は、?ボタン（ゲーム操作方法を説明するボタン）がクリックされた際に呼び出されます。
-
-- `Explaination_CanvasPanel` の表示状態を `ESlateVisibility::SelfHitTestInvisible` に設定し、操作説明の画像を表示します。
-
-### OnClickedGameEndExplaination_Button 関数
-
-この関数は、操作説明を閉じるボタンがクリックされた際に呼び出されます。
-
-- `Explaination_CanvasPanel` の表示状態を `ESlateVisibility::Hidden` に設定し、操作説明の画像を非表示にします。
+### `OnClickedGameEndExplaination_Button()`
+`Explaination_CanvasPanel->SetVisibility(ESlateVisibility::Hidden)` で操作説明パネルを非表示にします。

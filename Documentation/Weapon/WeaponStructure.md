@@ -1,47 +1,70 @@
 # WeaponStructure 構造体の概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/ArmedWeapon/WeaponStructure.h`
 
-`WeaponStructure` 構造体は、武器に関連するさまざまな情報を格納するためのデータ構造です。この構造体は、特に武器に関するソケットや音、発砲時のエフェクト、弾薬クラスなど、武器に関連する重要なプロパティを保持します。
+## 概要
 
-- **武器のアタッチに関する情報**: 武器をどのソケットにアタッチするかなどの情報を含んでいます。
-- **武器のサウンドとエフェクト**: 装備時や発射時に使用される音や発砲時のエフェクトも定義されています。
-- **データテーブルとしての利用**: この構造体は `WeaponDataTable` としてデータテーブル形式で他のクラスから参照され、武器のカスタマイズや挙動を制御します。
+`FWeaponStructure` は `FTableRowBase` を継承した DataTable 行構造体です。  
+`DT_Weapon` の 1 行が 1 武器に対応し、武器に必要なソケット名・SE・エフェクト・アニメーション・弾薬を一元管理します。
 
-## 基本構造
+## DataTable 構造
 
-`FWeaponStructure` は `FTableRowBase` を継承しており、データテーブルとして使用できるように設計されています。`USTRUCT` マクロにより、構造体が `BlueprintType` として指定されており、Blueprint からも利用できるようになっています。
+```mermaid
+graph TD
+    DT["DT_Weapon（DataTable）"]
+    DT --> R["FWeaponStructure（1行 = 1武器）"]
 
-この構造体は、武器に必要なビジュアル、サウンド、エフェクト、弾薬に関する情報をまとめて保持しており、武器の挙動や見た目、発射時の動作などを統一的に管理するために設計されています。
+    R --> S1["AttachSocketName\nホルスター位置のソケット名\nデフォルト: None"]
+    R --> S2["EquipSocketName\n装備時の右手ソケット名\nデフォルト: Weapon_hand_rソケット"]
+    R --> S3["EquipmentNoise\n装備 SE\nUSoundBase*"]
+    R --> S4["HasPistol\nピストル系か\nbool: false"]
+    R --> S5["GunshotSound\n発射 SE\nUSoundBase*"]
+    R --> S6["MuzzleFire\nマズルフラッシュ\nUParticleSystem*"]
+    R --> S7["MuzzleFireSoketName\n発砲炎のソケット名\nデフォルト: MuzzleFlash"]
+    R --> S8["FiringMontage\n発射アニメーション\nUAnimMontage*"]
+    R --> S9["AmmunitionClass\n薬莢クラス\nTSubclassOf AWeaponAmmunition"]
+    R --> S10["AmmunitionSocketName\n薬莢排出ソケット名\nデフォルト: AmmoEject"]
+```
 
-### 各プロパティの説明
+## プロパティ一覧
 
-- **AttachSocketName**: 
-  - 武器をキャラクターにアタッチする際に使用するソケットの名前を指定します。アニメーションシーケンスとして使用される例では `ThirdPersonidle` があり、ここでのデフォルト値は `"None"` です。
-  
-- **EquipSocketName**: 
-  - 装備時に武器を接続するためのソケット名を指定します。この場合、右手 (`Weapon_hand_rソケット`) に装備される設定です。
+| フィールド | 型 | デフォルト値 | 説明 |
+|---|---|---|---|
+| `AttachSocketName` | `FName` | `"None"` | ホルスター位置のソケット名。`AWeapon::BeginPlay` と武器解除時に使用 |
+| `EquipSocketName` | `FName` | `"Weapon_hand_rソケット"` | 右手の装備ソケット名。装備時に使用（※デフォルト値に日本語を含む） |
+| `EquipmentNoise` | `USoundBase*` | null | 武器を装備するときの SE |
+| `HasPistol` | `bool` | false | ピストル系の武器か（アニメーションの姿勢分岐に使用） |
+| `GunshotSound` | `USoundBase*` | null | 発射時の SE |
+| `MuzzleFire` | `UParticleSystem*` | null | マズルフラッシュのパーティクル |
+| `MuzzleFireSoketName` | `FName` | `"MuzzleFlash"` | マズルフラッシュを出すソケット名（※フィールド名は "Soket" のスペルミス） |
+| `FiringMontage` | `UAnimMontage*` | null | 発射時にキャラクターで再生するアニメーションモンタージュ |
+| `AmmunitionClass` | `TSubclassOf<AWeaponAmmunition>` | null | スポーンする薬莢アクタークラス |
+| `AmmunitionSocketName` | `FName` | `"AmmoEject"` | 薬莢が排出されるソケット名 |
 
-- **EquipmentNoise**: 
-  - 武器を装備するときに再生される音を指定します。`USoundBase` 型で、音の再生に使用されます。
+> **スペルミスについて**  
+> `MuzzleFireSoketName` は "Socket" の "c" が欠落しています（ソース上の実装に合わせて記載）。
 
-- **HasPistol**: 
-  - このフラグは、武器がピストルかどうかを判断するために使用されます。`bool` 型で、デフォルト値は `false` です。
+## DataTable の行名と武器の対応
 
-- **GunshotSound**: 
-  - 武器を発射した際の銃声を格納するためのプロパティです。`USoundBase` 型で、発射時にこの音が再生されます。
+DataTable の行名は `AWeapon::WeaponMesh->ComponentTags[0]`（Blueprint 側で設定）と  
+`AAIEnemy::BeginPlay` のハードコード値で参照されます。
 
-- **MuzzleFire**: 
-  - 発射時の発砲炎のエフェクトを指定します。`UParticleSystem` 型で、発砲時の視覚的な効果を定義しています。
+| 行名 | 参照元 | 用途 |
+|---|---|---|
+| `"Rifle"` | `AAIEnemy::BeginPlay`（ハードコード） | 全敵キャラクターが使用する固定武器 |
+| `"Rifle"` / `"Shotgun"` / `"Pistol"` など | `AWeapon::WeaponMesh->ComponentTags[0]` | プレイヤーが持つ各武器 Blueprint のタグ設定 |
 
-- **MuzzleFireSoketName**: 
-  - 発砲炎が表示されるソケットの名前を指定します。デフォルトでは `"MuzzleFlash"` という名前になっています。
+## 各フィールドの使用箇所
 
-- **FiringMontage**: 
-  - 武器を発射したときにキャラクターに再生されるアニメーションを指定します。`UAnimMontage` 型で、発砲アクションに関連する身体の動きを制御します。
-
-- **AmmunitionClass**: 
-  - 武器の弾薬クラスを指定します。このクラスは `AWeaponAmmunition` 型のサブクラスとして指定され、実際に武器から発射される弾薬のクラスを決定します。
-
-- **AmmunitionSocketName**: 
-  - 弾薬が出るソケットの名前を指定します。デフォルトでは `"AmmoEject"` という名前が設定されており、弾が排出される位置を定義しています。 
+| フィールド | 使用クラス |
+|---|---|
+| `AttachSocketName` | `AWeapon::BeginPlay`、`GUNMANCharacter::AttachingAndRemovingGun`（解除時） |
+| `EquipSocketName` | `GUNMANCharacter::AttachingAndRemovingGun`（装備時）、`AAIEnemy::BeginPlay` |
+| `EquipmentNoise` | `GUNMANCharacter::AttachingAndRemovingGun` |
+| `HasPistol` | `GUNMANCharacter::EquipWeapon`（アニメーション分岐） |
+| `GunshotSound` | `GUNMANCharacter::AnimationAtFiring`、`AAIEnemy::AttackCharacter_Implementation` |
+| `MuzzleFire` | `GUNMANCharacter::AnimationAtFiring`、`AAIEnemy::AttackCharacter_Implementation` |
+| `MuzzleFireSoketName` | `GUNMANCharacter::AnimationAtFiring`、`AAIEnemy::AttackCharacter_Implementation`、`AAIEnemy::CreateAmmunition` |
+| `FiringMontage` | `GUNMANCharacter::AnimationAtFiring`、`AAIEnemy::AttackCharacter_Implementation` |
+| `AmmunitionClass` | `GUNMANCharacter::AnimationAtFiring`、`AAIEnemy::AttackCharacter_Implementation` |
+| `AmmunitionSocketName` | `AAIEnemy::CreateAmmunition`（ライントレース開始点） |

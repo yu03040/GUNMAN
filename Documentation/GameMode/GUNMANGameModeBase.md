@@ -1,23 +1,47 @@
-TT# GUNMANGameModeBase クラスの概要
+# GUNMANGameModeBase クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/GameModes/GUNMANGameModeBase.h / .cpp`
 
-![GameMode_ClassDiagram](Images/GameMode_ClassDiagram.png)  
+## 概要
 
-`AGUNMANGameModeBase` クラスは、すべてのゲームモードに共通する基底クラスとして設計されています。このクラスを基にして、各ゲームの具体的なルールやロジックを定義した派生クラスを作成します。`AGUNMANGameModeBase` は以下の基本的な機能を提供します。
+`AGUNMANGameModeBase` は `AGameModeBase` を継承した、全 GameMode の基底クラスです。  
+このクラス自体には固有のロジックは持たず、派生クラスが `BeginPlay` / `Tick` をオーバーライドして機能を追加します。
 
-- **ゲームの初期化処理**: `BeginPlay` メソッドを使用して、ゲーム開始時に特定の処理を実行する仕組みを提供。
-- **フレーム毎の更新**: `Tick` メソッドで、毎フレームに行う更新処理のフックを提供。
+## クラス図
 
-この基底クラスは、シンプルなフレームワークを提供し、具体的なゲームのルールや動作はこのクラスを継承した派生クラスで実装されます。
+```mermaid
+classDiagram
+    AGameModeBase <|-- AGUNMANGameModeBase
+    AGUNMANGameModeBase <|-- ATitleGameMode
+    AGUNMANGameModeBase <|-- AGUNMANGameMode
+    AGUNMANGameModeBase <|-- AGameClearMode
+    AGUNMANGameModeBase <|-- AGameOverMode
 
-## このクラスのソースコードの説明
+    class AGUNMANGameModeBase {
+        +BeginPlay()
+        +Tick(float DeltaTime)
+    }
+    class ATitleGameMode { <<stub>> }
+    class AGameClearMode { <<stub>> }
+    class AGameOverMode { <<stub>> }
+    class AGUNMANGameMode {
+        -int GameClearKillCount = 10
+        -float GameOverTime = 0.0
+        -float GameClearWaitingTime = 2.0
+        +Tick(float DeltaTime)
+        +DisplayTimeLimit()
+        +OpenGameClearMap()
+        +OpenGameOverMap()
+    }
+```
 
-#### コンストラクター `AGUNMANGameModeBase::AGUNMANGameModeBase`
-- **クラスの初期化**: コンストラクター内では特定の処理は行っていませんが、この関数はゲームモードが生成された際に一度呼ばれる。通常、この部分に初期化処理を追加することができます。
+## 関数の説明
 
-#### `BeginPlay` 関数
-- **ゲーム開始時の処理**: `BeginPlay` はゲームが開始された際に呼ばれる関数で、ここでは基底クラス `Super::BeginPlay()` の呼び出しを行っています。派生クラスでカスタムの初期化処理を実装する場合、この関数をオーバーライドして追加の処理を行うことが可能です。
+### `AGUNMANGameModeBase()` コンストラクタ
+特別な初期化処理は行いません。
 
-#### `Tick` 関数
-- **毎フレームの更新処理**: `Tick` 関数は、ゲームの各フレームごとに呼ばれる更新処理です。`DeltaTime` 引数はフレーム間の時間を示しており、時間に依存する処理を行う際に使用されます。ここでも、基底クラスの `Super::Tick(DeltaTime)` が呼ばれており、フレーム毎の共通処理が継続されます。派生クラスでこの関数をオーバーライドして、独自のフレームごとのロジックを追加できます。
+### `BeginPlay()`
+`Super::BeginPlay()` を呼び出します。派生クラスでオーバーライドして初期化処理を追加できます。
+
+### `Tick(float DeltaTime)`
+`Super::Tick(DeltaTime)` を呼び出します。派生クラスでオーバーライドしてフレームごとの処理を追加できます。

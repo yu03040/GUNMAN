@@ -1,18 +1,37 @@
 # AIEnemyInterface クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/Enemy/AIEnemyInterface.h / .cpp`
 
-`AIEnemyInterface` クラスは、敵AIの特定の動作を定義するためのインターフェースです。このインターフェースは、AIの挙動に関する共通の関数を宣言し、それを継承したクラスで実際の処理を実装する形を取っています。
+## 概要
 
-- **インターフェースの定義**: インターフェースを使うことで、複数のクラスに同じ機能を強制的に持たせることができます。このインターフェースを継承したクラスは、敵AIが行うべき共通の処理（例: 攻撃やスピードの変更）を実装する必要があります。
-- **処理の内容**: インターフェース内では関数の宣言のみが行われており、実際の処理は継承先のクラスで実装されます。`BlueprintNativeEvent` として宣言されているため、C++コードとブループリントの両方で実装できます。
+`IAIEnemyInterface` は敵キャラクターへの命令を抽象化するインターフェースです。  
+`BlueprintNativeEvent` として宣言されており、C++ と Blueprint の両方で実装できます。  
+`AAIEnemy` が実装し、Behavior Tree タスクから呼び出されます。
+
+## クラス図
+
+```mermaid
+classDiagram
+    class IAIEnemyInterface {
+        <<interface>>
+        +AttackCharacter()
+        +ChangeRunningSpeed(float Speed)
+    }
+    IAIEnemyInterface <|.. AAIEnemy : implements
+    UBTT_ShootPlayer ..> IAIEnemyInterface : Execute_AttackCharacter
+    UBTT_RunningToTarget ..> IAIEnemyInterface : Execute_ChangeRunningSpeed
+```
 
 ## 関数の説明
 
-### `AttackCharacter` 関数
-- 敵AIがプレイヤーキャラクターなどを攻撃するための関数です。この関数を使用して、敵AIの攻撃アクションを実装します。`BlueprintNativeEvent` として宣言されているため、C++とブループリントの両方でこの関数を実装できます。
+### `AttackCharacter()`
 
-### `ChangeRunningSpeed` 関数
-- 敵AIの追跡スピードを変更するための関数です。パラメータとして受け取った `Speed` の値を使って、敵の移動速度を調整します。この関数も `BlueprintNativeEvent` として宣言されています。
+敵が攻撃を実行するための関数です。  
+`UBTT_ShootPlayer::ExecuteTask` から `Execute_AttackCharacter(Enemy)` として呼ばれます。  
+実装クラス `AAIEnemy::AttackCharacter_Implementation` で発射 SE・アニメーション・ライントレース判定を行います。
 
-このインターフェースを通じて、敵AIの基本的な行動パターン（攻撃、スピード変更）を抽象化し、さまざまな敵タイプに共通の処理を提供することが可能です。
+### `ChangeRunningSpeed(float Speed)`
+
+敵の移動速度を変更するための関数です。  
+`UBTT_RunningToTarget::ExecuteTask` から `Execute_ChangeRunningSpeed(Enemy, RunningSpeed)` として呼ばれます。  
+実装クラス `AAIEnemy::ChangeRunningSpeed_Implementation` で Timeline を再生し速度を補間します。

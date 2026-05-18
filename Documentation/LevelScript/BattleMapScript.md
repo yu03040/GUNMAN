@@ -1,35 +1,80 @@
 # BattleMapScript クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/LevelScript/BattleMapScript.h / .cpp`
 
-![Level_ClassDiagrams](Images/Level_ClassDiagrams.png)
+## 概要
 
-`ABattleMapScript` クラスは、Unreal Engine の `LevelScriptActor` クラスを継承し、`BaseMapScript` クラスも継承しているバトルマップ用のカスタムクラスです。このクラスでは、バトルマップで必要な入力処理やポーズメニューの操作を実装しています。以下は主な機能です。
+`ABattleMapScript` は `ABaseMapScript` を継承した**バトルマップ専用の LevelScript** です。  
+ポーズメニューの表示・非表示と、ポーズ中の入力コンテキスト切り替えを管理します。
 
-- **プロパティの初期化**: コンストラクタ内で、ポーズメニュー用ウィジェットの初期化、入力アクション（上下キーや決定キー）のロードが行われています。
-- **EnhancedInput の使用**: Enhanced Input System を活用し、バトルマップ用の入力システムを構築しています。プレイヤーが操作するキーイベントを `InputAction` で管理し、ポーズメニューの操作に対応しています。
-- **ポーズメニューの管理**: ポーズメニューの表示や非表示、選択状態に応じたボタンの色変更、およびボタンのクリックイベントによる機能実行を行います。
-- **仮想関数のオーバライド**: ボタンの色変更やボタン選択に応じた動作をオーバライドして、ポーズメニューの操作を実装しています。
+クラス継承図は [BaseMapScript](BaseMapScript.md) を参照してください。
+
+## プロパティ一覧
+
+| プロパティ | アクセス | 型 | 初期値 | 説明 |
+|---|---|---|---|---|
+| `PauseMenuMappingContext` | **public** | `UInputMappingContext*` | `IMC_OperatingUI` | ポーズメニュー専用の入力マッピング。`GUNMANCharacter::PressedActionPauseMenu` が直接参照するため public |
+| `UI_PaseMenu` | protected | `UUI_PaseMenu*` | null | ポーズメニューウィジェットの参照（※ソース上のスペルミス "Pase"） |
+| `UpAction` | private | `UInputAction*` | `IA_UpArrowKey` | 上移動アクション |
+| `DownAction` | private | `UInputAction*` | `IA_DownArrowKey` | 下移動アクション |
+| `DecisionAction` | private | `UInputAction*` | `IA_Enter` | 決定アクション |
+| `MaxButtonCounter` | — | `int` | 3 | ボタン数 |
+| `InvalidButtonIndex` | — | `int` | 4 | 範囲外インデックス |
+
+## ボタンインデックスと対応
+
+| ButtonCounter | ボタン | 処理 |
+|---|---|---|
+| 1 | Back To Title | `OnClickedBackToTitle_Button()` でタイトルへ遷移 |
+| 2 | Cancel（ゲームに戻る） | `OnClickedCancel_Button()`・入力コンテキストをゲーム用に戻す・`ButtonCounter = 1` にリセット |
+| 3 | Game End | `OnClickedGameEnd_Button()` でアプリ終了 |
+
+## 入力アクション一覧
+
+`BeginPlay` でバインドされます（`IMC_OperatingUI` は `GUNMANCharacter` が `PressedActionPauseMenu` で追加）。
+
+| InputAction | トリガー | コールバック |
+|---|---|---|
+| `IA_UpArrowKey` | Triggered | `UI_UpwardMovement` |
+| `IA_DownArrowKey` | Triggered | `UI_DownwardMovement` |
+| `IA_Enter` | Triggered | `UpdateOutputButton` |
 
 ## 関数の説明
 
-### コンストラクタ（`ABattleMapScript::ABattleMapScript`）
-- **UI関連のプロパティ初期化**: `UI_PauseMenu`, `UI_Character` を初期化し、`MaxButtonCounter` と `InvalidButtonIndex` を設定します。
-- **EnhancedInputアセットのロード**: `ConstructorHelpers::FObjectFinder` を使用して、Enhanced Input の `InputMappingContext` および `InputAction` をロードし、バトルマップでの入力処理を準備します。
+### `ABattleMapScript()` コンストラクタ
+- `MaxButtonCounter = 3`、`InvalidButtonIndex = 4`
+- `IMC_OperatingUI` を `PauseMenuMappingContext` としてロード
+- `IA_UpArrowKey`・`IA_DownArrowKey`・`IA_Enter` をロード
 
-###  `BeginPlay` 関数 
-- **プレイヤーコントローラーの取得**: `UGameplayStatics::GetPlayerController` を使用して、現在のプレイヤーコントローラーを取得します。
-- **マッピングコンテキストの追加**: `EnhancedInputLocalPlayerSubsystem` を通じて、ロードされた `InputMappingContext` をサブシステムに追加します。`EnhancedInputComponent` を取得し、上下キーや決定キーに対応するアクションをバインドしています。
+### `BeginPlay()`
+プレイヤーコントローラーの `InputComponent` に上下・決定アクションを直接バインドします。  
+ポーズメニューはこの時点では表示せず、`GUNMANCharacter::PressedActionPauseMenu` から `InitializeButtonPosition` が呼ばれたときに表示されます。
 
-###  `EndPlay` 関数 
-- **マッピングコンテキストの削除**: ゲーム終了時に `EnhancedInputLocalPlayerSubsystem` を通じて、ロードされた `InputMappingContext` をサブシステムから削除します。これはポーズメニューが終了した後のクリーンアップ処理です。
+### `EndPlay(const EEndPlayReason::Type)`
+`PauseMenuMappingContext` を `EnhancedInputLocalPlayerSubsystem` から削除してクリーンアップします。
 
-###  `ChangeButtonColor` 関数 
-- **ボタン色の初期化**: `Back To Title Button`、`Cancel Button`、`End Button` ボタンの色を白にリセットします。
-- **選択状態のボタンの色を変更**: `ButtonCounter` の値に応じて、選択されたボタンの色を `SelectedColor` に変更します。
+### `InitializeButtonPosition()`
+`GUNMANCharacter::PressedActionPauseMenu` から呼ばれます。
 
-### `UpdateOutputButton` 関数
-- **選択されたボタンのアクション実行**: `ButtonCounter` の値に基づき、対応するボタンがクリックされたときの動作を実行します。例えば、`Back To Title Button` が選択されていれば、タイトル画面に戻る機能が実行されます。
+```mermaid
+flowchart TD
+    A["SetGamePaused(true)\nゲームを一時停止"]
+    A --> B["SetInputMode(FInputModeGameOnly)"]
+    B --> C["DisplayPauseMenu(PlayerController)"]
+    C --> D["BackToTitle ボタンを SelectedColor に設定\nButtonCounter は 1 のまま"]
+```
 
-### `InitializeButtonPosition` 関数
-- ポーズメニューのウィジェットを生成し、画面に表示します。最初に `Back To Title Button` を選択状態に設定し、プレイヤーがゲームパッドで操作できるように入力モードも設定しています。
+### `DisplayPauseMenu(TObjectPtr<APlayerController>&)`
+`WBP_PaseMenu` Blueprint を同期ロードし、`UUI_PaseMenu` ウィジェットを生成して `AddToViewport` します。
+
+### `ChangeButtonColor()`
+全ボタン（BackToTitle・Cancel・GameEnd）を白にリセットしてから、  
+`ButtonCounter` に対応するボタンを `SelectedColor` に変更します。
+
+### `UpdateOutputButton()`
+
+| ButtonCounter | 処理 |
+|---|---|
+| 1 | `OnClickedBackToTitle_Button()` → タイトル遷移 |
+| 2 | `OnClickedCancel_Button()` でポーズメニューを閉じ、`PauseMenuMappingContext` を削除して `GUNMANCharacter->DefaultMappingContext` を追加。`ButtonCounter = 1` にリセット |
+| 3 | `OnClickedGameEnd_Button()` → アプリ終了 |

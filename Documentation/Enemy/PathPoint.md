@@ -1,15 +1,32 @@
 # PathPoint クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/Enemy/PathPoint.h / .cpp`
 
-`PathPoint` クラスは、`AActor` を継承しています。  
-敵が巡回するための場所を定義するアクタークラスです。  
-このクラスは、`FVector` 型の配列を持っており、その配列に巡回する場所（座標）が格納されます。巡回ポイントを設定することで、敵 AI はこれらのポイントを移動ルートとして使用することができます。
+## 概要
 
-## このクラスのソースコードの説明
+`APathPoint` は `AActor` を継承した、敵の巡回ルートを定義するアクターです。  
+`FVector` 型の配列 `PathPoint` に巡回座標を格納し、`BTT_TaskPath` がこの配列を順番に参照して敵を移動させます。  
+`MakeEditWidget="true"` 属性により、Unreal エディタ上でビジュアルウィジェットを使って座標を直接配置できます。
 
-### `PathPoint`
-- このプロパティは、敵が巡回する各ポイントの位置情報を格納する `FVector` 型の配列です。`EditAnywhere` 属性により、エディタで直接編集が可能であり、`BlueprintReadWrite` によってブループリントからもアクセスができます。
-- `MakeEditWidget="true"` によって、エディタ上でビジュアル的に巡回ポイントを配置できます。
+## プロパティ
 
-このクラスは主に、敵 AI の巡回ルートの定義に使用され、巡回ポイントを視覚的に設定できる便利なツールを提供しています。
+| プロパティ | 型 | 説明 |
+|---|---|---|
+| `PathPoint` | `TArray<FVector>` | 巡回ポイントの座標配列。エディタで直接編集可能 |
+
+## 使われ方
+
+```mermaid
+flowchart LR
+    P["APathPoint\nレベルに配置\nPathA / PathB タグを付与"]
+    T["BTT_TaskPath::ExecuteTask"]
+    E["AAIEnemy::index\n現在のインデックス"]
+
+    T -->|"GetAllActorsOfClassWithTag(Tags[0])"| P
+    P -->|"PathPoint[Enemy->index]"| T
+    T --> E
+    E -->|"インデックスを更新"| T
+```
+
+`BTT_TaskPath` は `GetAllActorsOfClassWithTag` でタグ一致の `BP_PathPoint` を検索し、  
+`GetActorTransform().TransformPosition(PathPoint[Enemy->index])` でローカル座標をワールド座標に変換して移動先を決定します。

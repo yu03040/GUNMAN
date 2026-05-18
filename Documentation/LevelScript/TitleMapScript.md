@@ -1,34 +1,73 @@
 # TitleMapScript クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/LevelScript/TitleMapScript.h / .cpp`
 
-![Level_ClassDiagrams](Images/Level_ClassDiagrams.png)
+## 概要
 
-`TitleMapScript` クラスは、`BaseMapScript` クラスを継承したタイトルマップ専用のクラスです。このクラスは、タイトル画面でのUI操作を管理する役割を持っています。
+`ATitleMapScript` は `ABaseMapScript` を継承した**タイトルマップ専用の LevelScript** です。  
+タイトルメニューの表示・ボタン選択・操作説明パネルの開閉を管理します。
 
-- **LevelScriptActorの継承**: このクラスは `LevelScriptActor` を継承し、レベル固有のロジックを実装しています。
-- **EnhancedInputの利用**: `EnhancedInput` システムを使用して、タイトルマップ用の入力システムを構築しています。
-- **UI管理**: タイトルメニューウィジェットを表示し、ユーザーがメニュー項目を選択できるようにします。
-- **仮想関数のオーバーライド**: 親クラスから継承された仮想関数 (`ChangeButtonColor` や `UpdateOutputButton`) をオーバーライドし、選択されたボタンの色変更やクリックイベントを発生させます。
+クラス継承図は [BaseMapScript](BaseMapScript.md) を参照してください。
+
+## プロパティ一覧
+
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `UI_Title` | `UUITitle*` | null | タイトルメニューウィジェットの参照 |
+| `DefaultMappingContext` | `UInputMappingContext*` | `IMC_OperatingUI` | UI 操作用の入力マッピング |
+| `EnterAction` | `UInputAction*` | `IA_Enter` | 決定アクション |
+| `DownArrowKeyAction` | `UInputAction*` | `IA_DownArrowKey` | 下移動アクション |
+| `UpArrowKeyAction` | `UInputAction*` | `IA_UpArrowKey` | 上移動アクション |
+| `MaxButtonCounter` | `int` | 3 | ボタン数 |
+| `InvalidButtonIndex` | `int` | 4 | 範囲外インデックス |
+
+## ボタンインデックスと対応
+
+| ButtonCounter | ボタン | 処理 |
+|---|---|---|
+| 1 | Game Start | `OnClickedGameStart_Button()` → BattleMap へ遷移 |
+| 2 | Game End | `OnClickedGameEnd_Button()` → アプリ終了 |
+| 3 | ?（操作説明） | `OnClickedGameStartExplaination_Button()` → 操作説明パネルを表示、`HasMovedToInstructions = true` |
+
+## 入力アクション一覧
+
+| InputAction | トリガー | コールバック |
+|---|---|---|
+| `IA_Enter` | Triggered | `UpdateOutputButton` |
+| `IA_DownArrowKey` | Triggered | `UI_DownwardMovement` |
+| `IA_UpArrowKey` | Triggered | `UI_UpwardMovement` |
 
 ## 関数の説明
 
-### コンストラクター（`ATitleMapScript::ATitleMapScript`）
-- **UI関連のプロパティ初期化**: `UI_Title` を初期化し、`MaxButtonCounter` と `InvalidButtonIndex` を設定します。
-- **EnhancedInputアセットのロード**: `ConstructorHelpers` を使用して、`EnhancedInput` の `InputMappingContext` と `InputAction` をロードします。これにより、プレイヤーが使用する入力アクションが設定されます。
+### `ATitleMapScript()` コンストラクタ
+- `MaxButtonCounter = 3`、`InvalidButtonIndex = 4`
+- `IMC_OperatingUI` / `IA_Enter` / `IA_DownArrowKey` / `IA_UpArrowKey` をロード
 
-### `BeginPlay` 関数
-- **プレイヤーコントローラーの取得**: `UGameplayStatics::GetPlayerController` を使用して、現在のプレイヤーコントローラーを取得します。
-- **マッピングコンテキストの追加**: `EnhancedInputLocalPlayerSubsystem` を通じて、ロードされた `InputMappingContext` をサブシステムに追加します。
-- **入力セットアップ**: `SetupInput` 関数を呼び出し、プレイヤー入力コンポーネントにアクションをバインドします。
-- **タイトルウィジェットの表示**: タイトルメニューのウィジェットを作成し、画面に表示します。最初に `Game Start` ボタンを選択状態に設定します。
+### `BeginPlay()`
+1. `IMC_OperatingUI` を `EnhancedInputLocalPlayerSubsystem` に追加
+2. `SetupInput` で入力アクションをバインド
+3. `WBP_Title` を同期ロードして `UUITitle` ウィジェットを生成・`AddToViewport`
+4. `SetInputMode(FInputModeGameOnly)` でゲームパッド操作を有効化
+5. `GameStart` ボタンを `SelectedColor` で初期選択状態にする
 
-### `SetupInput` 関数
-- **入力アクションのバインド**: `EnhancedInputComponent` を使用して、`EnterAction`、`DownArrowKeyAction`、`UpArrowKeyAction` をそれぞれの関数 (`UpdateOutputButton`、`UI_DownwardMovement`、`UI_UpwardMovement`) にバインドします。
+### `SetupInput(TObjectPtr<UInputComponent>)`
+`EnhancedInputComponent` に Enter・Down・Up アクションを上表のコールバックにバインドします。
 
-### `ChangeButtonColor` 関数
-- **ボタン色の初期化**: `Game Start`、`Game End`、`Game Start Explanation` ボタンの色を白にリセットします。
-- **選択状態のボタンの色を変更**: `ButtonCounter` の値に応じて、選択されたボタンの色を `SelectedColor` に変更します。
+### `ChangeButtonColor()`
+全ボタン（GameStart・GameEnd・?）を白にリセットしてから、`ButtonCounter` に対応するボタンを `SelectedColor` にします。
 
-### `UpdateOutputButton` 関数
-- **選択されたボタンのアクション実行**: `ButtonCounter` の値に基づき、対応するボタンがクリックされたときの動作を実行します。`Game Start Explanation` ボタンが選択された場合は、操作説明キャンバスを開き、そのキャンバスに対する終了ボタンの色を `SelectedColor` に変更します。
+### `UpdateOutputButton()`
+
+```mermaid
+flowchart TD
+    A{HasMovedToInstructions == true ?}
+    A -- Yes --> B["OnClickedGameEndExplaination_Button()\n操作説明パネルを閉じる\nHasMovedToInstructions = false"]
+    A -- No  --> C{ButtonCounter}
+    C -- 1 --> D["OnClickedGameStart_Button()\n→ BattleMap へ遷移"]
+    C -- 2 --> E["OnClickedGameEnd_Button()\n→ アプリ終了"]
+    C -- 3 --> F["OnClickedGameStartExplaination_Button()\n操作説明パネルを表示\nGameEndExplaination ボタンを SelectedColor に設定\nHasMovedToInstructions = true"]
+```
+
+操作説明パネル表示中（`HasMovedToInstructions == true`）に Enter を押すと、  
+パネルを閉じて `HasMovedToInstructions = false` に戻ります。  
+`UI_UpwardMovement` / `UI_DownwardMovement` は `HasMovedToInstructions` が `true` の間は無効化されます。

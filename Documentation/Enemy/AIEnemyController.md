@@ -1,28 +1,95 @@
 # AIEnemyController クラスの概要
 
-## 主な処理内容
+ソースコード: `Source/GUNMAN/Enemy/AIEnemyController.h / .cpp`
 
-`AIEnemyController` クラスは、`AAIController` を継承した AI キャラクターである `AIEnemy` を制御するためのコントローラーです。このクラスでは、AI の視覚に関連する機能を提供し、ビヘイビアツリー（Behavior Tree）を通じて敵の意思決定を管理します。コンストラクターでは、AI の知覚コンポーネントの設定、視覚情報の定義、ビヘイビアツリーのロードを行います。また、AI がプレイヤーを感知した際の処理や、プレイヤーを見失った際の対処も実装されています。
+## 概要
 
-## このクラスのソースコードの説明
+`AAIEnemyController` は `AAIController` を継承し、`IEnemyAIControllerInterface` を実装する敵 AI コントローラーです。  
+`AI Perception`（視覚）でプレイヤーを検知し、Blackboard を更新することで `BT_PatrolAI` の動作を切り替えます。
 
-### コンストラクター （`AAIEnemyController::AAIEnemyController`）
-- **AI Perception の作成**: AI が周囲の情報を感知するための `UAIPerceptionComponent` を作成し、視覚を通じて情報を取得できるように設定しています。
-- **視覚の設定**: `UAISenseConfig_Sight` を使って AI の視覚範囲、周辺視野角度、対象の検知範囲（敵、ニュートラル、味方）を定義しています。
-- **PerceptionUpdated イベントのバインド**: `OnTargetPerceptionUpdated` イベントに `PerceptionUpdated` 関数を関連付けて、視覚情報が更新された際の処理を定義しています。
-- **ビヘイビアツリーのロード**: `ConstructorHelpers::FObjectFinder<UBehaviorTree>` を使用してビヘイビアツリー（`BT_PatrolAI`）をロードし、AI の行動を管理するための準備をしています。
+## クラス図
 
-### `BeginPlay` 関数
-- **ビヘイビアツリーの開始**: ゲーム開始時にビヘイビアツリーを実行し、AI の行動を管理します。
+```mermaid
+classDiagram
+    AAIController <|-- AAIEnemyController
+    IEnemyAIControllerInterface <|.. AAIEnemyController : implements
 
-このクラスは、AI の感知機能とビヘイビアツリーを組み合わせることで、動的な意思決定を行うためのフレームワークを提供します。### `UpdateTargetActorKey_Implementation` 関数
-- **Blackboard の更新**: この関数は、AI が現在追跡している対象のアクターを `BlackboardComponent` にセットします。これにより、AI がターゲットを認識して行動を変更できます。
+    class AAIEnemyController {
+        +UAIPerceptionComponent AIPerception
+        +UAISenseConfig_Sight SightConfig
+        +PerceptionUpdated(AActor*, FAIStimulus)
+        +TargetLost()
+        +UpdateTargetActorKey_Implementation(AActor*)
+        +UpdateHasLineOfSightKey_Implementation(bool)
+        +GetBTAsset() UBehaviorTree*
+    }
+```
 
-### `UpdateHasLineOfSightKey_Implementation` 関数
-- **視界の有無を BlackBoard にセット**: AI がターゲットを視界に捉えているかどうかを `BlackboardComponent` に設定する関数です。これにより、ターゲットが視界にあるかどうかを他のシステムで参照できます。
+---
 
-### `PerceptionUpdated` 関数
-- **視覚の更新処理**: AI が新たに感知したアクター（`Actor`）がプレイヤーかどうかを判定し、プレイヤーを認識した場合は `BlackboardComponent` を通じてターゲット情報を更新します。また、視界からプレイヤーが外れた場合は、一定時間後にターゲットをリセットします。
+## 視覚センサー設定値
 
-### `TargetLost` 関数
-- **ターゲットを見失ったときの処理**: AI が一定時間プレイヤーを視界に捉えられなかった場合、ターゲットの情報を `BlackboardComponent` からクリアします。
+コンストラクタで `UAISenseConfig_Sight` に以下の値を設定します。
+
+| パラメータ | 値 | 説明 |
+|---|---|---|
+| `SightRadius` | 500.0 | 視界範囲（半径 cm） |
+| `LoseSightRadius` | 550.0 | 視界を失う距離（SightRadius + 50） |
+| `PeripheralVisionAngleDegrees` | 90.0 | 周辺視野角（片側 90°） |
+| `MaxAge` | 5.0 | 刺激情報の最大保持時間（秒） |
+| `bDetectEnemies / Neutrals / Friendlies` | すべて true | 全 Affiliation を検知対象にする |
+
+---
+
+## Blackboard キー一覧
+
+| キー名 | 型 | 説明 |
+|---|---|---|
+| `"TargetActor"` | Object | 追跡対象のアクター（プレイヤー or null） |
+| `"HasLIneOfSight"` | bool | 視界内にターゲットがいるか（※ソース上のスペルミス "LIne"） |
+
+---
+
+## 関数の説明
+
+### `AAIEnemyController()` コンストラクタ
+
+1. `UAIPerceptionComponent` を生成し `SetPerceptionComponent` で登録
+2. `UAISenseConfig_Sight` を生成して上表の値を設定し `ConfigureSense` に追加
+3. `OnTargetPerceptionUpdated` に `PerceptionUpdated` をバインド
+4. `BT_PatrolAI` をロード
+
+### `BeginPlay()`
+
+`RunBehaviorTree(BTAsset)` で `BT_PatrolAI` を起動します。
+
+### `PerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)`
+
+`OnTargetPerceptionUpdated` のコールバックです。
+
+```mermaid
+flowchart TD
+    A["PerceptionUpdated 呼び出し"]
+    A --> B{受信アクターがプレイヤーか？}
+    B -- No --> Z["何もしない"]
+    B -- Yes --> C{Stimulus.WasSuccessfullySensed()\n&&\nEnemyActor->GetIsAlive()?}
+    C -- Yes --> D["タイマーをリセット\nUpdateTargetActorKey(Player)\nUpdateHasLineOfSightKey(true)"]
+    C -- No --> E["SetTimer(5.0s) → TargetLost()\nUpdateHasLineOfSightKey(false)"]
+```
+
+- 視界に入った場合：Blackboard の `TargetActor` にプレイヤーをセットし、`HasLIneOfSight` を `true` に
+- 視界から外れた場合：5 秒後に `TargetLost()` を呼ぶタイマーをセットし、`HasLIneOfSight` を `false` に
+
+### `TargetLost()`
+
+タイマーのコールバックです。`UpdateTargetActorKey_Implementation(nullptr)` を呼び、Blackboard の `TargetActor` を null にして追跡を解除します。
+
+### `UpdateTargetActorKey_Implementation(AActor* TargetActor)`
+
+`IEnemyAIControllerInterface::UpdateTargetActorKey` の実装です。  
+`BlackboardComponent->SetValueAsObject("TargetActor", TargetActor)` で追跡対象を更新します。
+
+### `UpdateHasLineOfSightKey_Implementation(bool HasLineOfSight)`
+
+`IEnemyAIControllerInterface::UpdateHasLineOfSightKey` の実装です。  
+`BlackboardComponent->SetValueAsBool("HasLIneOfSight", HasLineOfSight)` で視界フラグを更新します。

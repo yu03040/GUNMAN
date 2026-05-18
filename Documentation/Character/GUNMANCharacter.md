@@ -1,183 +1,344 @@
 # GUNMANCharacter クラスの説明
 
-## GUNMANCharacter クラスの概要
-![GUNMANCharacter](Images/GUNMANCharacter.png)
+## 概要
 
-![GUNMANCharacter_ClassDiagram](Images/GUNMANCharacter_ClassDiagram.png)
+`AGUNMANCharacter` は `ACharacter` を継承したプレイヤーキャラクタークラスです。  
+`IAnimationInterface` と `IWeaponInterface` の 2 つのインターフェースを実装し、  
+移動・射撃・視点切り替え・武器管理・ダメージ処理をすべて担当します。
 
-`GUNMANCharacter` クラスは、プレイヤーキャラクターとして動作する `ACharacter` クラスを継承したクラスです。  
-このキャラクターは、ゲーム内での移動やアクション、カメラの操作、銃を使用する機能を持っています。  
-`ThirdPersonCharacter`	クラスは `GUNMANCharacter` クラスを継承した Blueprint クラスです。
+Blueprint クラス `BP_ThirdPersonCharacter` はこのクラスを継承しています。
 
-主な機能は以下の通りです。
+## クラス図
 
-- **コンストラクターでの設定**: Tick の設定、カプセルコンポーネントの初期化、カメラの設定、銃メッシュやマズルの設定、AI 感知コンポーネントの設定、Enhanced Input のロードとバインド、タイムラインの設定。
-- **入力処理**: Enhanced Input を使用して、さまざまなアクション（移動、ジャンプ、射撃、カメラ切り替え、武器の装備/脱装備）に対して入力をバインドしています。
-- **OnConstruction**: 一人称視点の銃をアタッチし、キャラクターが使用できるように設定します。
-- **UIの表示**: 銃を構えた時に照準のウィジェットやキャラクターの UI を表示します。
-- **その他の機能**: 銃の発射、発射アニメーション、武器のアタッチ/リムーブ、ダメージ処理、移動、視点の操作など。
+```mermaid
+classDiagram
+    ACharacter <|-- AGUNMANCharacter
+    IAnimationInterface <|.. AGUNMANCharacter : implements
+    IWeaponInterface <|.. AGUNMANCharacter : implements
+    AGUNMANCharacter <|-- BP_ThirdPersonCharacter
 
-## このクラスのソースコードの説明
+    class AGUNMANCharacter {
+        -USpringArmComponent CameraBoom
+        -UCameraComponent ThirdPersonCamera
+        -UCameraComponent FirstPersonCamera
+        -USkeletalMeshComponent Mesh1P
+        -USkeletalMeshComponent FP_Gun
+        -USkeletalMeshComponent Weapon
+        -float MaxHealth = 1000
+        -float FiringInterval = 0.1
+        +OnFire()
+        +OnFPFire()
+        +ToggleBetweenTPSAndFPS()
+        +FireState_Implementation(bool)
+        +AttachWeapon_Implementation(USkeletalMeshComponent*, FName)
+    }
+    class BP_ThirdPersonCharacter {
+        <<Blueprint>>
+    }
+```
 
-### コンストラクター（`AGUNMANCharacter::AGUNMANCharacter`）
-`AGUNMANCharacter` クラスのコンストラクターは、キャラクターの初期設定を行います。カメラ、キャラクターのカプセルコンポーネント、武器、AI 感知コンポーネント、Enhanced Input の設定が含まれています。
+---
 
-1. **カプセルコンポーネントの設定**:
-   - キャラクターのコリジョン範囲を設定します。デフォルトでは半径 42.0f、カプセルの高さ 96.0f に設定されています。これにより、キャラクターの衝突判定を行う領域が決まります。
+## コンポーネント一覧
 
-2. **カメラの設定**:
-   - 一人称視点 (FPS) と三人称視点 (TPS) 用のカメラをそれぞれ設定します。FPS 用のカメラはキャラクターの目の位置に近く、TPS 用のカメラはキャラクターの背後に配置されます。また、カメラの回転やズームの設定も行います。
+| コンポーネント | 型 | 説明 |
+|---|---|---|
+| `CameraBoom` | `USpringArmComponent` | TPS カメラをキャラクター背後に配置するスプリングアーム（長さ 300）。壁衝突検出あり |
+| `ThirdPersonCamera` | `UCameraComponent` | TPS 用カメラ。`CameraBoom` の先端にアタッチ |
+| `FirstPersonCamera` | `UCameraComponent` | FPS 用カメラ。カプセルに直接アタッチ、`bUsePawnControlRotation = true` |
+| `Mesh1P` | `USkeletalMeshComponent` | FPS 用の腕メッシュ。`SetOnlyOwnerSee(true)` でオーナーにのみ表示 |
+| `FP_Gun` | `USkeletalMeshComponent` | FPS 用銃メッシュ。`Mesh1P` の `GripPoint` ソケットにアタッチ（OnConstruction） |
+| `FP_MuzzleLocation` | `USceneComponent` | FPS 投射物のスポーン基点 |
+| `Weapon` | `USkeletalMeshComponent` | TPS 用武器スロット（常に非表示。実際の武器は `WeaponMeshes` で管理） |
+| `StimuliSourceComponent` | `UAIPerceptionStimuliSourceComponent` | 敵 AI がプレイヤーを視覚で感知するための刺激源 |
 
-3. **AI 感知コンポーネント**:
-   - キャラクターが周囲の音や視覚的な情報を感知するための `UAIPerceptionStimuliSourceComponent` を設定します。AI キャラクターがプレイヤーを検知できるようになります。
+---
 
-4. **武器とマズルの設定**:
-   - 武器メッシュと発射点 (マズル) の設定を行います。一人称視点用の銃の位置、三人称視点用の銃の位置がそれぞれ設定され、マズルフラッシュを表示するための座標も決定されます。
+## プロパティ一覧
 
-5. **タイムラインの設定**:
-   - 移動速度を補間するためのタイムラインを初期化します。これにより、キャラクターの速度変更やその他のアニメーションがスムーズに行われます。
+### カメラ
 
-### `BeginPlay` 関数
-ゲーム開始時にプレイヤーコントローラーを取得し、Enhanced Input の設定を行います。さらに、三人称視点アニメーションの設定や UI の表示もここで行います。
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `BaseTurnRate` | `float` | 45.0 | 左右視点移動速度（deg/sec） |
+| `BaseLookUpRate` | `float` | 45.0 | 上下視点移動速度（deg/sec） |
+| `CameraBoomSocketOffset` | `FVector` | — | エイム時のカメラオフセット目標値（エディタで設定） |
+| `CameraBoomTargetOffset` | `FVector` | — | カメラブームのターゲットオフセット |
 
-1. **プレイヤーコントローラーの取得**:
-   - キャラクターがプレイヤーによって操作されている場合、そのコントローラーを取得します。これにより、入力や HUD の設定が正しく行われます。
+### FPS 専用
 
-2. **Enhanced Input の設定**:
-   - Enhanced Input によって管理される各アクションをゲーム内で利用可能にするための初期化が行われます。射撃、移動、カメラ切り替えなどのアクションがここで設定されます。
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `FP_WeaponATK` | `float` | 5.0 | FPS モードの固定攻撃力 |
+| `ProjectileClass` | `TSubclassOf<AFirstPersonProjectile>` | — | FPS 投射物クラス |
+| `GunOffset` | `FVector` | (100, 0, 10) | 銃口とキャラクター位置のオフセット |
+| `FireAnimation` | `UAnimMontage*` | — | FPS 発射アニメーション |
 
-3. **UI の表示**:
-   - キャラクターが武器を構えた時に表示される照準や、その他のゲーム内 UI（例えば HP バーや弾薬カウントなど）が初期化されます。
+### TPS 武器
 
-### コンストラクションスクリプト（`OnConstruction`）
-コンストラクションスクリプトとは ゲームプレイ中ではなく編集時やコンパイル時に実行できる Blueprint です。
-Blueprint でのコンストラクションスクリプトの処理を C++ で実装する際にこの関数を使います。  
-- ゲーム内でのキャラクターの構築時に、一人称視点用の銃を腕にアタッチします。
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `WeaponMeshes` | `TArray<USkeletalMeshComponent*>` | — | 所持武器メッシュの配列 |
+| `WeaponNumber` | `int` | — | 現在装備中の武器インデックス |
+| `WeaponNumberCounter` | `int` | — | 次に装備する武器インデックス（CountWeapon が更新） |
+| `EquippedWeapon` | `USkeletalMeshComponent*` | — | 現在装備中の武器メッシュ |
+| `EquippedWeaponInfo` | `FWeaponStructure` | — | 現在装備中の武器データ（DataTable から取得） |
+| `TP_RifleATK` | `float` | 5.0 | ライフルの攻撃力（WeaponNumber == 0） |
+| `TP_ShotgunATK` | `float` | 15.0 | ショットガンの攻撃力（WeaponNumber == 1） |
+| `TP_PistolATK` | `float` | 10.0 | ピストルの攻撃力（WeaponNumber その他） |
+| `WeaponEmitter` | `UParticleSystem*` | — | 着弾エフェクト |
+| `bIsAimingState` | `bool` | false | 現在エイム中か |
 
-### `Tick` 関数
-毎フレーム呼び出され、リアルタイムでの処理を行う関数です。ここでは、タイムラインの更新が管理されます。
+### 射撃制御
 
-- **タイムラインの状態管理**:
-   - タイムラインが再生中かどうかを確認し、再生中であれば、キャラクターの移動速度などのパラメータを補間して更新します。これにより、滑らかなアニメーションや動作が実現されます。
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `bCanAttack` | `bool` | true | 発砲可能か（AnimNotify が制御） |
+| `FiringInterval` | `float` | 0.1 | 連射間隔（秒） |
+| `FireTimerHandle` | `FTimerHandle` | — | 連射タイマーのハンドル |
+| `bHasArms` | `bool` | false | 武器を装備中か |
+| `bIsFP` | `bool` | false | 現在 FPS モードか |
+| `bIsFlipped` | `bool` | true | TPS/FPS 切り替えフラグ |
 
-### `LoadEnhancedInput` 関数
-プレイヤーの入力処理を行うために、Enhanced Input アクションやコンテキストをロードする関数です。
-- **アクションのロード**:
-   - ジャンプ、射撃、移動、カメラの切り替えなどのプレイヤーアクションがここで定義され、プレイヤーが行う操作に応じて処理が実行されます。
+### ゲームプレイ
 
-### `SetupPlayerInputComponent` 関数
-プレイヤー入力コンポーネントの設定を行います。Enhanced Input に基づいてアクションをバインドし、プレイヤーの入力を正しく処理します。
+| プロパティ | 型 | 初期値 | 説明 |
+|---|---|---|---|
+| `MaxHealth` | `float` | 1000.0 | 最大体力 |
+| `CurrentHealth` | `float` | 1000.0 | 現在の体力 |
+| `DeadHealth` | `float` | 0.0 | 死亡判定の体力閾値 |
+| `KillCount` | `int` | 0 | 倒した敵の数 |
 
-### `StartFire, FiringEvent, StopFire, OnFire, StartFPFire, FPFiringEvent, StopFPFire, OnFPFire` 関数
-キャラクターが銃を発射する際の処理を行う関数群です。  
-**「FP」**  がついている関数は一人称視点で銃を発射する際の処理を行う関数群です。
+---
 
-#### `StartFire/StartFPFire`:
-   - プレイヤーが発射ボタンを押した時に呼び出され、射撃アニメーションやサウンドを再生します。また、弾薬が発射されます。
+## 入力アクション一覧
 
-#### `FiringEvent/FPFiringEvent`:
-   - フルオート射撃のような連続射撃が可能な場合、弾が発射され続けるイベントを管理します。
+`LoadEnhancedInput()` でコンストラクタ時にロードされ、`SetupPlayerInputComponent()` でバインドされます。
 
-#### `StopFire/StopFPFire`:
-   - 射撃ボタンが離された際に射撃を停止し、発射アニメーションを終了させます。
+| InputAction アセット | トリガー | コールバック |
+|---|---|---|
+| `IA_Jump` | Started / Completed | `StartJump` / `StopJump` |
+| `IA_Fire` | Triggered / Completed | `StartFire` / `StopFire` |
+| `IA_FPFire` | Triggered / Completed | `StartFPFire` / `StopFPFire` |
+| `IA_Toggle` | Triggered | `ToggleBetweenTPSAndFPS` |
+| `IA_ReadyGun` | Triggered / Completed | `StartReadyGun` / `StopReadyGun` |
+| `IA_SwitchAndEquipWeapons` | Triggered | `AttachingAndRemovingGun` |
+| `IA_Run` | Triggered / Completed | `StartTimeline` / `ReverseTimeline` |
+| `IA_PauseMenu` | Triggered | `PressedActionPauseMenu` |
+| `IA_MoveForward` | Triggered | `MoveForward` |
+| `IA_MoveRight` | Triggered | `MoveRight` |
+| `IA_Look` | Triggered | `Look` |
 
-#### `OnFire/OnFPFire`:
-   - 銃が発射された時にアニメーション、サウンド、弾の発射を処理し、敵にダメージを与えるなどのロジックを実行します。
+---
 
-### `FireState_Implementation` 関数
-- 射撃可能な状態を管理する実装です。
+## 関数の説明
 
-### `AttachWeapon_Implementation` 関数
-- 銃をキャラクターにアタッチするためのメソッドです。
+### 初期化
 
-### `AnimationAtFiring` 関数
-射撃時に再生されるアニメーションを管理します。
+#### `AGUNMANCharacter()` コンストラクタ
+カプセルサイズ・カメラ・各メッシュ・武器・AI 刺激源を生成し、`LoadEnhancedInput()` と `CreateTimeline()` を呼び出します。
 
-- 射撃が行われた際に再生されるアニメーションを切り替え、リロードやその他の動作に対応します。
+主な初期値：
+- `CameraBoom->TargetArmLength = 300.0f`
+- `JumpZVelocity = 600.0f`（StartJump 時に 400.0f に上書き）
+- `bOrientRotationToMovement = true`
 
-### `ToggleBetweenTPSAndFPS` 関数
-キャラクターの視点をTPS（サードパーソン）とFPS（ファーストパーソン）の間で切り替えます。
+#### `LoadEnhancedInput()`
+`ConstructorHelpers::FObjectFinder` で `IMC_Default` および 11 個の `InputAction`・`DT_Weapon` DataTable をロードし、各メンバー変数に代入します。コンストラクタからのみ呼ばれます。
 
-- `bIsFlipped` というフラグを使って、現在の視点を確認
-- `ToggleFlipflop` 関数を呼び出してカメラのアクティブ状態やキャラクターのメッシュ表示を変更します。
-- 最終的に `bIsFlipped` を反転させて、次回呼び出されたときに正しく視点を切り替えられるようにします。
+#### `BeginPlay()`
+1. `DefaultMappingContext` を `EnhancedInputLocalPlayerSubsystem` に登録
+2. マウスカーソルを非表示にし入力モードをゲームのみに設定
+3. `DisplayCharacterUI` / `DisplayGunSight` で UI を生成
+4. `TPMeshAnimInstance` を取得
+5. `ToggleFlipflop(true, false)` で初期状態を TPS に設定
+6. `OnTakeAnyDamage` に `HandleAnyDamage` をバインド
 
-### `ToggleFlipflop` 関数
-この関数は、TPSとFPSの視点切り替えに関する処理を実行します。特に、次の要素を切り替えます：
-- カメラのアクティブ状態 (`ThirdPersonCamera` と `FirstPersonCamera`)
-- キャラクターのメッシュ表示 (`GetMesh()` と `Mesh1P`)
-- 武器の表示や非表示
-- キャラクターの向き (`bUseControllerRotationYaw`)
-- FPSモードの場合の武器の状態
+#### `OnConstruction(const FTransform&)`
+`FP_Gun` を `Mesh1P` の `GripPoint` ソケットに `SnapToTarget` でアタッチします。ゲームプレイ中ではなくエディタ上でも実行されます。
 
-### `StartReadyGun` 関数
-キャラクターが武器を準備するためのプロセスを開始します。
+#### `Tick(float DeltaTime)`
+1. `RunTimeline` が再生中なら `TickTimeline(DeltaTime)` を呼ぶ
+2. `ChangeCameraOffset(DeltaTime)` でカメラオフセットを補間
 
-- `GunPreparationProcess` 関数を呼び出し、キャラクターのエイム状態を設定
-- 照準 (`UIGunSightRef`) を画面に表示します。
+---
 
-### `GunPreparationProcess` 関数
-キャラクターのエイム状態やカメラの設定を変更します。具体的には：
-- `bIsAiming` フラグに基づき、エイム状態を更新
-- カメラアームの長さや位置、キャラクターの向きなどを変更
-- アニメーションインターフェースを通じて、アニメーションにエイム状態を反映させます
+### カメラ・視点
 
-### `StopReadyGun` 関数
-武器の準備を終了し、エイム状態を解除します。また、照準を画面から取り除きます。
+#### `ChangeCameraOffset(float& DeltaTime)`
+TPS モード時に毎フレーム呼ばれ、カメラブームのオフセットを `FMath::Lerp` で補間します。  
+FPS モード中（`bIsFP == true`）は即座に return します。
 
-### `AttachingAndRemovingGun` 関数
-キャラクターが武器を装備または取り外す際に使用されます。
-- 武器のインデックスに基づいて、武器をセットし、表示または非表示にします。
-- データテーブルから武器の情報を取得し、発砲時のアクションを設定します。
+キャラクター前方へ短い LineTrace を行い、3 つの状態を判定します：
 
-### `PressedActionPoseMenu` 関数
-ポーズメニューに関連するアクションを実行します。特定のバトルマップにアクセスし、ポーズメニューのボタン配置を初期化し、プレイヤーコントローラーの入力マッピングコンテキストを切り替えます。
+| 状態 | 条件 | TargetArmLength | SocketOffset |
+|---|---|---|---|
+| 壁衝突 | `HitResult.bBlockingHit` | → 100 | → (0, 0, 60) |
+| エイム中 | `bIsAimingState` | → 300 | → `CameraBoomSocketOffset` |
+| 通常 | それ以外 | → 300 | 変更なし |
 
-### `StartJump` 関数
-キャラクターがジャンプを開始する際に呼び出される関数です。
+#### `ToggleBetweenTPSAndFPS()`
+`bIsFlipped` を確認してフラグを反転させながら `ToggleFlipflop` を呼び出します。  
+TPS → FPS 遷移時は照準 UI を非表示にします。  
+FPS → TPS 遷移時は武器装備かつエイム中の場合のみ照準 UI を再表示します。
 
-- `Jump()` 関数を呼び出し、ジャンプが可能かをチェックします。また、キャラクターの移動速度に応じてジャンプ力 (`JumpZVelocity`) を設定します。
+#### `ToggleFlipflop(bool bIsTPActive, bool bIsFPActive)`
+カメラ・メッシュ・武器の表示を切り替えます：
+- `ThirdPersonCamera` / `FirstPersonCamera` のアクティブ状態を切り替え
+- `bUseControllerRotationYaw` を FPS 時のみ `true` に
+- TPS メッシュ（`GetMesh()`）、FPS メッシュ（`Mesh1P` / `FP_Gun`）の表示切り替え
+- シーン内のすべての `AWeapon` アクターを検索し、TPS 時のみ表示
+- `bIsFP` フラグを更新
 
-### `StopJump` 関数
-ジャンプを終了するための関数です。
+---
 
-- `StopJumping()` を呼び出し、ジャンプの状態をリセットします。
+### 射撃
 
-### `HandleAnyDamage` 関数
-ダメージを受けた際に呼び出され、キャラクターの体力を減少させます。体力が一定値以下になった場合にはゲームオーバーマップをロードします。
+#### `StartFire()` / `StopFire()`
+`FTimerManager` に `FiringInterval`（0.1 秒）間隔で `FiringEvent` を呼ぶタイマーを設定・解除します。
 
-### `CreateTimeline` 関数
-タイムラインを作成し、キャラクターのスピードを線形補間で制御します。`RunTimeline` を作成し、タイムラインの更新時に `Timeline_LinearInterpCharacterSpeed()` を呼び出します。
+#### `FiringEvent()`
+`bHasArms && bIsAimingState && bCanAttack && !bIsFP` の条件をすべて満たす場合に `OnFire()` を実行します。
 
-### `Timeline_LinearInterpCharacterSpeed` 関数
-タイムラインの進行に応じて、キャラクターの歩行速度を更新します。
+#### `StartFPFire()` / `StopFPFire()`
+同様に `FiringInterval` 間隔で `FPFiringEvent` を呼ぶタイマーを設定・解除します。
 
-### `StartTimeline` 関数
-タイムラインを開始する関数です。
+#### `FPFiringEvent()`
+`bIsFP` が true のときのみ `OnFPFire()` を実行します。
 
-### `ReverseTimeline` 関数
-タイムラインを逆再生するための関数です。
+#### `PerformEnemyLineTrace(FHitResult& OutHit) const`
+`ThirdPersonCamera` の位置から前方 10,000 ユニットへ `ECC_Visibility` でライントレースを行います。自分自身はトレース対象から除外します。TPS・FPS 両方の発射処理から共通で使用されます。
 
-### `RemoveWeapon` 関数
-キャラクターが所持している武器のインデックスに基づき、特定の武器を取り外す関数です。
+#### `OnFire()`
+TPS モードの発射処理です：
+1. `AnimationAtFiring()` でエフェクト・アニメーションを再生
+2. `PerformEnemyLineTrace` でヒット判定
+3. ヒットした敵が `AAIEnemy` かつ生存中なら着弾エフェクトをスポーン
+4. `WeaponNumber` に応じた攻撃力（下表）で `UGameplayStatics::ApplyDamage` を適用
+5. 撃破した場合は `KillCount` をインクリメント
 
-### `CountWeapon` 関数
-キャラクターが持っている武器の数をカウントし、次の武器を選択するためのインデックスを管理します。
+| WeaponNumber | 武器 | 攻撃力 |
+|---|---|---|
+| 0 | ライフル | 5.0 |
+| 1 | ショットガン | 15.0 |
+| その他 | ピストル | 10.0 |
 
-### `EquipWeapon` 関数
-武器をキャラクターに装備または取り外す処理を行います。アニメーションインターフェースを使って、装備状態をアニメーションにも反映します。
+#### `OnFPFire()`
+FPS モードの発射処理です。`PerformEnemyLineTrace` でヒット判定後、固定値 `FP_WeaponATK = 5.0` でダメージを適用します。撃破で `KillCount` をインクリメントします。
 
-### `DisplayGunSight` 関数
-銃の照準を画面に表示するための関数です。WidgetBlueprint からクラスを取得し、照準用のウィジェットを作成します。
+#### `AnimationAtFiring()`
+`bIsFP` の状態で処理を分岐します：
 
-### `DisplayCharacterUI` 関数
-キャラクターのUIを画面に表示します。`UUICharacter` のインスタンスを作成し、画面に追加します。
+| モード | 処理内容 |
+|---|---|
+| FPS | `FireSound` を再生、`Mesh1P` のアニメーションモンタージュを再生、`FP_MuzzleLocation` から `AFirstPersonProjectile` をスポーン |
+| TPS | `EquippedWeaponInfo.GunshotSound` を再生、マズルフラッシュをアタッチ、`FiringMontage` を再生、薬莢（`AWeaponAmmunition`）をスポーン |
 
-### `MoveForward` 関数
-キャラクターを前方に移動させるための関数です。プレイヤーの入力に基づいて、移動方向を決定し、その方向に移動します。
+---
 
-### `MoveRight` 関数
-キャラクターを右方向に移動させるための関数です。`MoveForward()` 同様に、入力に基づいて右方向に移動します。
+### エイム
 
-### `Look` 関数
-プレイヤーがマウスやコントローラーで視点を操作する際に呼び出される関数です。横方向（ヨー）と縦方向（ピッチ）の入力に基づいて視点を変更します。
+#### `StartReadyGun()`
+`bHasArms && !bIsFP` の場合のみ有効です。  
+`CameraBoom->SocketOffset` をエイム用オフセットに設定し、`GunPreparationProcess(true, false, true)` を呼んで照準 UI を表示します。
+
+#### `StopReadyGun()`
+`bHasArms && !bIsFP` の場合のみ有効です。  
+`CameraBoom->SocketOffset` をゼロベクトルに戻し、`GunPreparationProcess(false, true, false)` を呼んで照準 UI を非表示にします。
+
+#### `GunPreparationProcess(bool bIsAiming, bool bOrientRotationToMovement, bool bYawRotation)`
+エイム状態の内部処理です：
+1. `bIsAimingState` を更新
+2. `IAnimationInterface::AimingState` でアニメーションインスタンスに通知
+3. `bOrientRotationToMovement` と `bUseControllerRotationYaw` を更新
+
+---
+
+### 武器管理
+
+#### `AttachingAndRemovingGun()`
+FPS モード中は何もしません。武器の装備状態をトグルします：
+- **未装備時**: `WeaponMeshes[WeaponNumber]` を表示し、DataTable から `FWeaponStructure` を取得して `EquipWeapon()` を呼ぶ。装備音を再生し `CountWeapon()` で次のインデックスを記録
+- **装備済み時**: `RemoveWeapon()` で現在の武器メッシュを取得し、DataTable のホルスターソケットに戻す
+
+#### `EquipWeapon(bool bHasWeapon, bool bHasPistol, FName SoketName)`
+武器メッシュを指定ソケットにアタッチし、`bHasArms` を更新します。  
+`IAnimationInterface::EquippedState` でアニメーションインスタンスに装備状態を通知します。
+
+#### `CountWeapon(TArray<USkeletalMeshComponent*> Arms, int Number)`
+次に装備する武器のインデックスを `WeaponNumberCounter` に記録します。  
+`Number + 1 < Arms.Num()` なら `Number + 1`、そうでなければ `0`（先頭に折り返し）。
+
+#### `RemoveWeapon(TArray<USkeletalMeshComponent*> Arms, int Number)`
+現在装備中の武器メッシュを返します。`Number`（= `WeaponNumberCounter`）は既に次のインデックスを指しているため、`Number - 1` の武器が装備中です。`Number == 0` の場合は配列末尾を返します。
+
+#### `AttachWeapon_Implementation(USkeletalMeshComponent* WeaponMesh, FName AttachSoketName)`
+`IWeaponInterface` の実装です。レベルに配置された `AWeapon` アクターの `BeginPlay` から呼ばれます。  
+`WeaponMeshes` 配列に `WeaponMesh` を追加し、指定ソケットにアタッチします。
+
+---
+
+### 移動・入力
+
+#### `MoveForward(const FInputActionValue& Value)`
+コントローラーの Yaw 回転から前方ベクトルを算出し、正（前進）/ 負（後退）で `AddMovementInput` を呼びます。
+
+#### `MoveRight(const FInputActionValue& Value)`
+コントローラーの Yaw 回転から右方向ベクトルを算出し、`AddMovementInput` を呼びます。
+
+#### `Look(const FInputActionValue& Value)`
+2D 入力の X 軸を `AddControllerYawInput`（水平）、Y 軸を `AddControllerPitchInput`（垂直）に割り当てます。
+
+#### `StartJump()`
+`Jump()` を呼び、`JumpZVelocity` を 400.0f に設定します。
+
+#### `StopJump()`
+`StopJumping()` を呼び、`JumpButtonDown` をリセットし `JumpZVelocity` を 400.0f に戻します。
+
+#### `PressedActionPauseMenu()`
+現在のレベルスクリプトを `ABattleMapScript` にキャストし、成功した場合のみ実行します：
+1. `DefaultMappingContext` をサブシステムから削除
+2. `BattleMapScript->PauseMenuMappingContext` を追加（ポーズメニュー専用入力に切り替え）
+3. `BattleMapScript->InitializeButtonPosition()` でポーズメニューを表示
+
+バトルマップ以外ではキャストが失敗するため何もしません。
+
+---
+
+### ダメージ処理
+
+#### `HandleAnyDamage()`
+`OnTakeAnyDamage` デリゲートのコールバックです。`CurrentHealth -= Damage` を行い、`CurrentHealth <= 0` になると `UGameplayStatics::OpenLevel` で `GameOverMap` へ遷移します。
+
+---
+
+### タイムライン
+
+#### `CreateTimeline()`
+`CB_Run` カーブをロードし、長さ 1 秒のタイムラインを初期化します。`Timeline_LinearInterpCharacterSpeed` をフレームコールバックとして登録します。コンストラクタからのみ呼ばれます。
+
+#### `Timeline_LinearInterpCharacterSpeed(float Value)`
+カーブの現在値をそのまま `CharacterMovement->MaxWalkSpeed` に代入します。
+
+#### `StartTimeline()` / `ReverseTimeline()`
+タイムラインを先頭から再生（加速）/ 末尾から逆再生（減速）します。  
+`IA_Run` の Triggered / Completed にそれぞれバインドされています。
+
+---
+
+### UI
+
+#### `DisplayGunSight(TObjectPtr<APlayerController>& PlayerController)`
+`WBP_UIGunSight` から `UIGunSightRef` を生成します。ビューポートへの追加はここでは行わず、エイム時に `StartReadyGun` / `ToggleBetweenTPSAndFPS` が制御します。
+
+#### `DisplayCharacterUI(TObjectPtr<APlayerController>& PlayerController)`
+`WBP_UICharacter` を生成してビューポートに追加します（BeginPlay 時に一度だけ呼ばれます）。
+
+---
+
+### Getter
+
+| 関数 | 戻り値 | 説明 |
+|---|---|---|
+| `GetKillCount()` | `int` | 撃破数 `KillCount` を返す |
+| `CalcHealthPercent()` | `float` | `CurrentHealth / MaxHealth` を返す（UI の体力バーが使用） |
