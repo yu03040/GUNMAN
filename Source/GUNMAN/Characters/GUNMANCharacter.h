@@ -225,7 +225,7 @@ private:
 
 protected:
 	// プレイヤーのスピード変化させるタイムライン
-	FTimeline* RunTimeline;
+	FTimeline RunTimeline;
 
 	// プレイヤーのスピード変化させる CurveAsset
 	TObjectPtr<class UCurveFloat> RunCurve;
@@ -330,6 +330,9 @@ protected:
 	// OnTakeAnyDamage イベントに関連付ける関数
 	UFUNCTION()
 	void HandleAnyDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, AController* InstigatedBy, AActor* DamageCauser);
+
+	// ライントレースを実行して敵に当たったか返す関数
+	bool PerformEnemyLineTrace(FHitResult& OutHit) const;
 
 	// タイムラインを開始する関数
 	UFUNCTION(BlueprintCallable, Category = Timeline)
